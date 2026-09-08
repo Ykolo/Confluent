@@ -4,8 +4,8 @@ Application Expo qui fusionne deux fichiers `.jwlibrary` en un seul, sans
 perte. Trois écrans : choisir les deux fichiers, lire le récapitulatif de la
 fusion, retrouver les fusions précédentes.
 
-    npm install
-    npx expo start
+    bun install
+    bun expo start
 
 Le moteur vit dans `src/merge.ts`. C'est un fichier autonome, sans dépendance
 à React Native : il ne connaît ni Expo ni Node, seulement `fflate` et le
