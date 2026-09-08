@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Confluent",
+    "slug": "confluent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "confluent",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FBF9F5",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.confluent.merge"
+    },
+    "android": {
+      "package": "app.confluent.merge"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-sharing",
+      "expo-font",
+      "expo-status-bar"
+    ]
+  }
+}
