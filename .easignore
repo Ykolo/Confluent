@@ -1,0 +1,11 @@
+# Ce qui ne monte pas sur les serveurs de build d'Expo.
+#
+# EAS téléverse le projet pour le compiler. Tout ce qui ne sert pas à
+# fabriquer l'app n'a rien à y faire — à commencer par les sauvegardes
+# réelles qui servent aux tests : elles portent des notes, des favoris et
+# des surlignages personnels.
+*.jwlibrary
+
+# Le moteur se teste en local, jamais pendant un build.
+tests/
+docs/

@@ -50,9 +50,9 @@ function FileSlot({ label, info, onPress, disabled, step }: {
       <Text style={styles.slotName} numberOfLines={2}>{info.name}</Text>
       {info.counts ? (
         <View style={styles.slotStats}>
-          <Text style={styles.meta}>{fmt.count(info.counts.notes)} notes</Text>
-          <Text style={styles.meta}>{fmt.count(info.counts.highlights)} surlignages</Text>
-          <Text style={styles.meta}>{fmt.count(info.counts.bookmarks)} favoris</Text>
+          <Text style={[styles.meta, styles.stat]}>{fmt.count(info.counts.notes)} notes</Text>
+          <Text style={[styles.meta, styles.stat]}>{fmt.count(info.counts.highlights)} surlignages</Text>
+          <Text style={[styles.meta, styles.stat]}>{fmt.count(info.counts.bookmarks)} favoris</Text>
         </View>
       ) : (
         <View style={styles.slotLoading}>
@@ -188,7 +188,12 @@ const styles = StyleSheet.create({
   slotHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   slotSize: { fontFamily: font.sans, fontSize: 13, color: color.fainter },
   slotName: { fontFamily: font.sansSemi, fontSize: 17, color: color.ink },
-  slotStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  // L'espacement passe par des marges et non par `gap`. Sur un conteneur en
+  // `flexWrap: 'wrap'`, la répartition de `gap` entre les lignes est le point de
+  // Yoga soupçonné d'avoir figé le thread JS au moment précis où cette rangée
+  // apparaissait. Des marges donnent la même image sans emprunter ce chemin.
+  slotStats: { flexDirection: 'row', flexWrap: 'wrap' },
+  stat: { marginRight: 18, marginTop: 2 },
   pressedCard: { opacity: 0.7 },
   dim: { opacity: 0.5 },
 

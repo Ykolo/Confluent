@@ -7,18 +7,34 @@
     "scheme": "confluent",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FBF9F5",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E5A46"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.confluent.merge"
     },
     "android": {
-      "package": "app.confluent.merge"
+      "package": "app.confluent.merge",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/icon-monochrome.png",
+        "backgroundColor": "#2E5A46"
+      }
     },
     "plugins": [
       "expo-sqlite",
       "expo-sharing",
       "expo-font",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6b1e38f0-1b11-42a0-9d1b-11a608ae307b"
+      }
+    }
   }
 }

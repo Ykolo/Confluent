@@ -26,12 +26,12 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { inspectBackup, type BackupInfo } from './src/backup-info';
 import {
-  installGlobalErrorLogging, isCancellation, logError, logInfo, stopwatch, timed,
+  installGlobalErrorLogging, isCancellation, logError, logInfo, stopwatch, timed, withTimeout,
   type ErrorView,
 } from './src/errors';
 import * as fmt from './src/format';
 import { addToHistory, loadHistory, type HistoryEntry } from './src/history';
-import { mergeBackups, type ConflictStrategy, type MergeReport } from './src/merge';
+import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
 import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
 import { color } from './src/theme';
@@ -98,6 +98,19 @@ function breathe(): Promise<void> {
 const BREATH_MS = 100;
 
 /**
+ * Au-delà de ce délai, le sélecteur natif est considéré comme perdu.
+ *
+ * Ce n'est pas une limite de patience imposée à l'utilisateur : parcourir un
+ * stockage en ligne prend légitimement des dizaines de secondes, d'où un délai
+ * large. C'est un filet contre le cas où le retour d'activité Android ne vient
+ * jamais — `getDocumentAsync` laisse alors sa promesse en attente pour de bon,
+ * le verrou `picking` ne se relève plus, et l'écran de choix devient inerte
+ * jusqu'au redémarrage de l'app. Mieux vaut rendre la main avec une erreur qui
+ * nomme le blocage.
+ */
+const PICKER_TIMEOUT = 120_000;
+
+/**
  * Tout ce qui remonte à l'écran passe par ici : la trace complète part dans la
  * console du poste de développement, l'utilisateur ne voit que la version
  * rédigée. Le `scope` est le nom de l'action en cours — il préfixe la ligne du
@@ -136,6 +149,18 @@ function Confluent() {
   const [progress, setProgress] = useState<{ step: string; ratio: number } | null>(null);
   const [error, setError] = useState<ErrorView | null>(null);
 
+  /**
+   * Les sauvegardes décompressées, tenues hors de l'état React.
+   *
+   * Un `Backup` porte plusieurs mégaoctets de tableaux typés : la base, et
+   * l'archive brute conservée pour les pièces jointes que la fusion réclamera.
+   * Rien de tout cela ne s'affiche — l'écran ne montre qu'un nom, une taille et
+   * trois compteurs. Les ranger dans l'état obligerait React à les faire
+   * traverser l'arbre des vues à chaque rendu ; une référence les garde à
+   * disposition de la fusion sans jamais les mettre sur ce chemin.
+   */
+  const backups = useRef<Record<Slot, Backup | null>>({ a: null, b: null });
+
   const [result, setResult] = useState<MergeResult | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -154,7 +179,8 @@ function Confluent() {
       setError({
         title: 'Sélecteur déjà ouvert',
         message: 'Une sélection de fichier est encore en cours.',
-        hint: 'Termine-la, ou ferme complètement l’app et rouvre-la si l’écran de choix ne revient pas.',
+        hint: `Termine-la. Si le sélecteur ne s’affiche pas, l’écran se débloquera de lui-même au bout de `
+          + `${Math.round(PICKER_TIMEOUT / 1000)} s — inutile d’appuyer plusieurs fois.`,
         technical: 'getDocumentAsync est encore en attente d’un retour du système',
       });
       return;
@@ -165,17 +191,29 @@ function Confluent() {
     const started = Date.now();
     try {
       logInfo('choix', `→ ouverture du sélecteur pour le fichier ${slot.toUpperCase()}`);
-      const picked = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        // Sur Android, la copie en cache atterrit dans le cache d'Expo Go, hors
-        // du répertoire auquel il donne accès : `File.bytes()` la refuse avec
-        // « Missing 'READ' permission ». L'URI content:// d'origine, elle, est
-        // lisible sans condition. Sur iOS la copie tombe dans le cache de
-        // l'app et se lit bien, alors que l'URL d'origine est à accès
-        // restreint et ne survit pas au sélecteur.
-        copyToCacheDirectory: Platform.OS === 'ios',
-        multiple: false,
-      });
+      // Le garde-temps ne peut pas annuler l'activité Android, seulement cesser
+      // de l'attendre. Si elle revient plus tard, sa réponse est perdue — c'est
+      // le prix à payer pour que l'écran redevienne utilisable.
+      const picked = await withTimeout(
+        `sélecteur du fichier ${slot.toUpperCase()}`, PICKER_TIMEOUT,
+        () => DocumentPicker.getDocumentAsync({
+          type: '*/*',
+          // Sur Android, la copie en cache atterrit dans le cache d'Expo Go,
+          // hors du répertoire auquel il donne accès : `File.bytes()` la refuse
+          // avec « Missing 'READ' permission ». L'URI content:// d'origine, elle,
+          // est lisible sans condition. Sur iOS la copie tombe dans le cache de
+          // l'app et se lit bien, alors que l'URL d'origine est à accès
+          // restreint et ne survit pas au sélecteur.
+          copyToCacheDirectory: Platform.OS === 'ios',
+          multiple: false,
+        }),
+        {
+          title: 'Sélecteur sans réponse',
+          message: 'Le sélecteur de fichiers ne s’est pas ouvert, ou n’a jamais rendu de réponse.',
+          hint: 'Copie tes sauvegardes dans « Téléchargements » sur le téléphone et choisis-les de là : '
+            + 'un stockage en ligne comme Google Drive passe par le réseau et peut ne jamais répondre.',
+        },
+      );
       lap(picked.canceled ? 'sélecteur fermé sans choix' : 'sélecteur refermé');
       if (picked.canceled) return;
       const asset = picked.assets[0];
@@ -237,7 +275,10 @@ function Confluent() {
 
       logInfo('choix', `décompression : ${slices} tranches, ${breaths} respirations — `
         + `${waiting} ms d’attente de la boucle, plus longue pause d’affilée ${slowest} ms`);
-      show(info);
+      // La sauvegarde décompressée part dans la référence, la fiche affichable
+      // dans l'état — celle-ci ne garde donc que du texte et des nombres.
+      backups.current[slot] = info.backup;
+      show({ ...info, backup: null });
       lap(`fichier ${slot.toUpperCase()} prêt : ${info.counts?.notes} notes, `
         + `${info.counts?.highlights} surlignages, ${info.counts?.bookmarks} favoris`);
     } catch (err) {
@@ -266,8 +307,8 @@ function Confluent() {
   const merge = useCallback(async () => {
     // Les deux sauvegardes doivent être entièrement lues : tant qu'une carte
     // n'affiche que son manifeste, il n'y a pas de base à fusionner.
-    const baseBackup = fileA?.backup;
-    const sourceBackup = fileB?.backup;
+    const baseBackup = backups.current.a;
+    const sourceBackup = backups.current.b;
     if (!fileA || !fileB || !baseBackup || !sourceBackup) return;
     setError(null);
     setStatus(null);

@@ -1,0 +1,21 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "bun": "1.4.0",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "bun": "1.4.0",
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}

@@ -190,14 +190,25 @@ export function describeError(err: unknown): ErrorView {
  *
  * Attention : cela n'interrompt pas le travail natif, cela cesse seulement de
  * l'attendre.
+ *
+ * `view` rédige l'erreur autrement quand l'appel surveillé n'est pas une
+ * requête SQLite — le sélecteur de documents, par exemple, se bloque pour de
+ * tout autres raisons et demande un autre conseil.
  */
-export function withTimeout<T>(label: string, ms: number, run: () => Promise<T>): Promise<T> {
+export function withTimeout<T>(
+  label: string,
+  ms: number,
+  run: () => Promise<T>,
+  view: Omit<ErrorView, 'technical'> = {
+    title: 'Opération bloquée',
+    message: 'L’app a cessé de répondre pendant l’accès à la base de données.',
+    hint: 'Ferme puis rouvre l’app et réessaie ; le détail ci-dessous indique l’étape en cause.',
+  },
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new AppError({
-        title: 'Opération bloquée',
-        message: 'L’app a cessé de répondre pendant l’accès à la base de données.',
-        hint: 'Ferme puis rouvre l’app et réessaie ; le détail ci-dessous indique l’étape en cause.',
+        ...view,
         technical: `${label} : aucune réponse après ${Math.round(ms / 1000)} s`,
       }));
     }, ms);
@@ -214,6 +225,26 @@ export function withTimeout<T>(label: string, ms: number, run: () => Promise<T>)
 // ---------------------------------------------------------------------------
 
 const TAG = 'Confluent';
+
+/**
+ * Heure locale, au format `HH:MM:SS.mmm`.
+ *
+ * Le terminal Expo n'horodate pas `console.log` : deux lignes séparées par
+ * trente secondes de silence s'y lisent comme deux lignes consécutives. C'est
+ * ce qui rend un journal inexploitable quand l'app paraît figée — on ne voit ni
+ * où le silence commence, ni combien de temps il a duré, et les durées mesurées
+ * par `timed` ne disent rien du temps passé *entre* les étapes.
+ *
+ * Le format est celui d'`adb logcat` à dessein : quand le diagnostic doit
+ * descendre jusqu'au natif, les deux journaux s'alignent ligne à ligne au lieu
+ * de devoir être recoupés à la main.
+ */
+function clock(): string {
+  const now = new Date();
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0');
+  return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+    + `.${pad(now.getMilliseconds(), 3)}`;
+}
 
 /**
  * Chronomètre une étape et la journalise avec sa durée.
@@ -249,8 +280,8 @@ export function stopwatch(scope: string, subject: string): (what: string) => voi
 
 /** Étape franchie : une ligne dans le terminal, rien à l'écran. */
 export function logInfo(scope: string, message: string, data?: unknown): void {
-  if (data === undefined) console.log(`[${TAG}] ${scope} — ${message}`);
-  else console.log(`[${TAG}] ${scope} — ${message}`, data);
+  if (data === undefined) console.log(`${clock()} [${TAG}] ${scope} — ${message}`);
+  else console.log(`${clock()} [${TAG}] ${scope} — ${message}`, data);
 }
 
 /**
@@ -260,7 +291,9 @@ export function logInfo(scope: string, message: string, data?: unknown): void {
  */
 export function logError(scope: string, err: unknown, view = describeError(err)): ErrorView {
   const lines = [
-    `[${TAG}] ✖ ${scope}`,
+    // Seule la première ligne est horodatée : les suivantes appartiennent au
+    // même bloc, et les préfixer noierait la pile sous des heures identiques.
+    `${clock()} [${TAG}] ✖ ${scope}`,
     `  affiché : ${view.title} — ${view.message}`,
     `  cause   : ${view.technical}`,
   ];

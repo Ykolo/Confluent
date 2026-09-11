@@ -106,6 +106,22 @@ export function SummaryScreen({
         {status && !error && <Text style={styles.status}>{status}</Text>}
         <PrimaryButton label="Enregistrer le fichier" onPress={onSave} disabled={busy} />
         <SecondaryButton label="Partager" onPress={onShare} disabled={busy} />
+        {/*
+          Ni enregistrer ni partager n'est obligatoire : la fusion est déjà
+          faite et le fichier est déjà écrit. Le ✕ de l'en-tête permettait
+          seul de sortir, mais rien n'y disait qu'on en avait le droit — d'où
+          cette sortie nommée, à côté des actions qu'elle remplace.
+        */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Terminer sans enregistrer le fichier"
+          disabled={busy}
+          hitSlop={8}
+          onPress={onClose}
+          style={({ pressed }) => [styles.finish, pressed && styles.finishPressed, busy && styles.dim]}
+        >
+          <Text style={styles.finishLabel}>Terminer sans enregistrer</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -160,5 +176,13 @@ const styles = StyleSheet.create({
   },
 
   footer: { paddingHorizontal: space.gutter, paddingTop: 12, paddingBottom: 4, gap: 10 },
+  finish: { alignItems: 'center', paddingVertical: 6 },
+  finishPressed: { opacity: 0.6 },
+  finishLabel: {
+    fontFamily: font.sansMedium,
+    fontSize: 14,
+    color: color.muted,
+    textDecorationLine: 'underline',
+  },
   status: { fontFamily: font.sansMedium, fontSize: 14, lineHeight: 19, color: color.accent },
 });
