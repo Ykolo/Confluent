@@ -42,6 +42,42 @@ nom du fichier produit.
 Le fichier produit sort en `.jwlibrary` : c'est l'extension que JW Library
 accepte à la restauration.
 
+## La version web
+
+Un site Next.js dans `web/`, déclaré comme workspace Bun : le `bun install` de
+la racine installe l'app et le site. Mêmes trois écrans, et surtout **le même
+moteur** : le site importe `src/merge.ts`, `backup-info.ts`, `errors.ts`,
+`format.ts`, `progress.ts` et `theme.ts` tels quels, par l'alias `@core/*`.
+
+    cd web
+    bun run dev      # http://localhost:3000
+    bun run build    # site statique dans web/out/
+    bun test         # l'hôte WebAssembly, contre celui de Bun
+
+Tout se passe dans le navigateur. Il n'y a pas de serveur (`output: 'export'`),
+les sauvegardes ne sont envoyées nulle part, et `web/out/` se publie sur
+n'importe quel hébergement statique. Sur Vercel : dossier racine `web`.
+
+| Fichier | Rôle |
+|---|---|
+| `web/components/Confluent.tsx` | Le pendant d'`App.tsx` : lecture, fusion, téléchargement, partage |
+| `web/components/` | Les trois écrans et leurs briques, en HTML + CSS Modules |
+| `web/lib/sqlite-wasm.ts` | `SqliteHost` + SHA-256 pour le navigateur |
+| `web/lib/history.ts` | Historique des fusions, en `localStorage` |
+| `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
+
+Deux particularités de l'hôte navigateur :
+
+- **SQLite n'est pas empaqueté.** Turbopack refuse `@sqlite.org/sqlite-wasm`
+  (il y trouve des `new Worker()` aux URL calculées). Le module est donc copié
+  tel quel dans `public/sqlite/` et importé hors bundler. La copie est refaite
+  à chaque `dev` ou `build`, et reste ainsi alignée sur la version installée.
+- **Le WAL passe par `locking_mode=EXCLUSIVE`.** Le VFS en mémoire du module
+  n'a pas de mémoire partagée : une base en mode WAL y échoue sur
+  `SQLITE_CANTOPEN`, avec ou sans journal à côté. En mode exclusif, SQLite
+  tient l'index du WAL dans le tas, et le journal d'une sauvegarde Android est
+  bien intégré. Le pragma doit précéder toute lecture.
+
 ## API
 
 ```ts

@@ -1,0 +1,388 @@
+/* Valeurs recopiées des trois écrans de `src/ui/`. */
+
+/* ——— Cadre ——— */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 520px;
+  min-height: 100dvh;
+  margin-inline: auto;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 26px max(8px, env(safe-area-inset-bottom));
+  background: var(--screen);
+}
+
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll {
+  flex: 1;
+  padding: 34px 26px 24px;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 26px 4px;
+}
+
+/* ——— Texte ——— */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.titleLarge,
+.title {
+  font-family: var(--font-serif), serif;
+  font-weight: 400;
+  color: var(--ink);
+}
+.titleLarge {
+  font-size: 34px;
+  line-height: 38px;
+}
+.title {
+  font-size: 32px;
+  line-height: 37px;
+}
+
+.lead {
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--muted);
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--fainter);
+}
+
+/* ——— Accueil ——— */
+
+.slots {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.emptySlot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 18px;
+  text-align: left;
+  border: 1px dashed var(--outline);
+  border-radius: var(--radius-card);
+  transition: border-color 120ms, background-color 120ms;
+}
+.emptySlot:not(:disabled):hover,
+.emptySlot.over {
+  border-color: var(--accent);
+}
+.emptySlot.over {
+  background: var(--card);
+}
+
+.filledSlot {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-card);
+  transition: opacity 120ms;
+}
+.filledSlot:not(:disabled):hover {
+  opacity: 0.8;
+}
+.emptySlot:disabled,
+.filledSlot:disabled {
+  opacity: 0.5;
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  transition: border-color 120ms;
+}
+.slot.over {
+  border-color: var(--accent);
+}
+
+.slotHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slotSize {
+  font-size: 13px;
+  color: var(--fainter);
+}
+
+.slotName {
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.slotStats {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 18px;
+  row-gap: 2px;
+}
+
+.slotLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.replaceHint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  text-align: center;
+}
+
+.privacy {
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--fainter);
+}
+
+.strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progressLabel {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ——— Récapitulatif ——— */
+
+.headerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--accent);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--onAccent);
+}
+
+.close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  border: 1px solid var(--outline);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--faint);
+}
+.close:not(:disabled):hover {
+  border-color: var(--faint);
+}
+.close:disabled {
+  opacity: 0.5;
+}
+
+.summaryTitle {
+  margin-top: 10px;
+}
+
+.table {
+  margin-top: 26px;
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--divider);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowLabel {
+  font-size: 15px;
+  color: var(--inkSoft);
+}
+
+.rowValue {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.rowValueDim {
+  color: var(--faint);
+}
+
+.output {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: var(--radius-card);
+  background: var(--sunken);
+}
+
+.outputName {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.caution {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--fainter);
+}
+
+.status {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--accent);
+}
+
+/* ——— Historique ——— */
+
+.historyHeader {
+  margin-bottom: 24px;
+}
+.historyHeader .lead {
+  margin-top: 8px;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 17px 18px;
+}
+
+.entryHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.entryName {
+  flex: 1;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.entryDate,
+.entrySize {
+  font-size: 13px;
+  color: var(--fainter);
+  white-space: nowrap;
+}
+
+.entryStats {
+  display: flex;
+  gap: 14px;
+}
+
+.entryItems {
+  font-size: 13px;
+  color: var(--inkSoft);
+}
+
+.empty {
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--fainter);
+}
+
+/* Sur un écran large, la colonne garde sa largeur de téléphone et se pose sur le canvas. */
+@media (min-width: 640px) {
+  .app {
+    min-height: auto;
+    margin-block: 40px;
+    background: var(--screen);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    overflow: clip;
+  }
+  .tabs {
+    position: static;
+    padding-bottom: 16px;
+  }
+}
