@@ -1,0 +1,25 @@
+{
+  "name": "confluent-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun scripts/copy-sqlite.ts && next dev",
+    "build": "bun scripts/copy-sqlite.ts && next build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "3.53.4-build1",
+    "fflate": "0.8.3",
+    "next": "16.3.5",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "~6.0.3"
+  }
+}

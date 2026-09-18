@@ -9,3 +9,6 @@
 # Le moteur se teste en local, jamais pendant un build.
 tests/
 docs/
+
+# Le site web se construit ailleurs : rien à y faire pour compiler l'app.
+web/

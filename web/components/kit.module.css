@@ -1,0 +1,226 @@
+/* Valeurs recopiées de `src/ui/kit.tsx`. Les états pressés deviennent aussi des survols. */
+
+.eyebrow {
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+  color: var(--fainter);
+}
+.accent { color: var(--accent); }
+.faint { color: var(--faint); }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.primary,
+.secondary,
+.dashed {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 16px;
+  transition: background-color 120ms, border-color 120ms, opacity 120ms;
+}
+.primary:disabled,
+.secondary:disabled,
+.dashed:disabled,
+.text:disabled {
+  opacity: 0.5;
+}
+
+.primary {
+  background: var(--accent);
+  border-radius: var(--radius-button);
+  padding-block: 19px;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--onAccent);
+}
+.primary:not(:disabled):hover,
+.primary:not(:disabled):active {
+  background: var(--accentPressed);
+}
+
+.secondary {
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-button);
+  padding-block: 18px;
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--inkSoft);
+}
+.secondary:not(:disabled):hover { border-color: var(--faint); }
+
+.dashed {
+  border: 1px dashed var(--outline);
+  border-radius: var(--radius-card);
+  padding-block: 15px;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--muted);
+}
+.dashed:not(:disabled):hover { border-color: var(--accent); }
+
+.text {
+  align-self: center;
+  padding: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.text:not(:disabled):hover { color: var(--inkSoft); }
+
+.plusRule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: 6px;
+}
+.rule {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+.plus {
+  font-family: var(--font-serif), serif;
+  font-size: 20px;
+  color: var(--fainter);
+}
+
+.segmentTrack,
+.tabTrack {
+  display: flex;
+  background: var(--sunken);
+}
+.segmentTrack {
+  gap: 8px;
+  border-radius: var(--radius-segment);
+  padding: 4px;
+}
+.tabTrack {
+  gap: 6px;
+  border-radius: var(--radius-button);
+  padding: 5px;
+}
+.segmentItem,
+.tabItem {
+  flex: 1;
+  font-weight: 500;
+  color: var(--faint);
+  transition: background-color 120ms, color 120ms;
+}
+.segmentItem {
+  padding: 11px 8px;
+  border-radius: var(--radius-segmentItem);
+  font-size: 14px;
+}
+.tabItem {
+  padding-block: 12px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+.segmentItem:not(:disabled):hover,
+.tabItem:not(:disabled):hover {
+  color: var(--inkSoft);
+}
+.segmentItem.active,
+.tabItem.active {
+  background: var(--card);
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(27 26 22 / 0.1);
+}
+.segmentItem:disabled:not(.active),
+.tabItem:disabled:not(.active) {
+  opacity: 0.6;
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+.progressFill {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 150ms linear;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--sunken);
+  border-top-color: var(--accent);
+  animation: spin 800ms linear infinite;
+  flex: none;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--dangerSurface);
+  border: 1px solid var(--dangerBorder);
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+.noticeHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.noticeTitle {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--danger);
+}
+.noticeClose {
+  width: 24px;
+  height: 24px;
+  margin-top: -2px;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--danger);
+}
+.noticeClose:hover { background: var(--dangerBorder); }
+.noticeMessage {
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--inkSoft);
+}
+.noticeHint {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.noticeToggle {
+  align-self: flex-start;
+  padding-top: 2px;
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: var(--faint);
+  text-decoration: underline;
+}
+.noticeTechnical {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--fainter);
+  overflow-wrap: anywhere;
+  user-select: text;
+}

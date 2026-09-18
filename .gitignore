@@ -6,3 +6,10 @@ dist/
 # Sauvegardes personnelles servant aux tests : elles restent sur le disque,
 # mais hors du dépôt — git les téléversait à chaque build EAS.
 *.jwlibrary
+
+# Site web (Next.js)
+web/.next/
+web/out/
+web/next-env.d.ts
+*.tsbuildinfo
+web/public/sqlite/

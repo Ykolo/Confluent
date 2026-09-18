@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "main": "index.js",
+  "workspaces": ["web"],
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
