@@ -23,6 +23,31 @@ export function percent(ratio: number): string {
   return `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}${THIN}%`;
 }
 
+/**
+ * Nom lisible d'un fichier enregistré hors de l'app, pour la confirmation
+ * affichée. `segment` est le dernier segment de l'URI écrite (`File.name`),
+ * `requested` le nom qu'on avait demandé.
+ *
+ * Un dossier choisi hors de l'app donne une URI `content://…/document/<id>`,
+ * dont le dernier segment est un identifiant de document percent-encodé, et
+ * souvent opaque : Google Drive y met `acc%3D1%3Bdoc%3DencodedZ0h4aWd…`, qui
+ * s'affichait tel quel. Décoder suffit pour les fournisseurs qui y rangent un
+ * chemin (`primary:Download/Fusion_2026-09-18.jwlibrary`) ; pour les autres,
+ * le nom demandé est la seule chose lisible à montrer.
+ */
+export function savedName(segment: string, requested: string): string {
+  let name = segment;
+  try {
+    name = decodeURIComponent(name);
+  } catch {
+    // Segment non décodable : il reste tel quel, et sera écarté juste après.
+  }
+  name = name.slice(name.lastIndexOf('/') + 1);
+  // Le système peut avoir renommé le fichier pour éviter une collision
+  // (« Fusion_2026-09-18 (1).jwlibrary ») : ce nom-là, on le garde.
+  return name.endsWith('.jwlibrary') ? name : requested;
+}
+
 const MONTHS = ['janv.', 'févr.', 'mars', 'avril', 'mai', 'juin',
   'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 

@@ -32,12 +32,15 @@ export interface SummaryScreenProps {
   error: ErrorView | null;
   onDismissError: () => void;
   onSave: () => void;
+  /** Remet le fichier au système, pour que JW Library puisse le prendre. */
+  onOpenInJwLibrary: () => void;
   onShare: () => void;
   onClose: () => void;
 }
 
 export function SummaryScreen({
-  report, fileName, fileSize, busy, status, error, onDismissError, onSave, onShare, onClose,
+  report, fileName, fileSize, busy, status, error, onDismissError, onSave, onOpenInJwLibrary,
+  onShare, onClose,
 }: SummaryScreenProps) {
   // Les trois premières lignes sont celles de la maquette ; les suivantes
   // n'apparaissent que lorsqu'elles ont quelque chose à dire.
@@ -105,6 +108,13 @@ export function SummaryScreen({
         {error && <ErrorNotice error={error} onDismiss={onDismissError} />}
         {status && !error && <Text style={styles.status}>{status}</Text>}
         <PrimaryButton label="Enregistrer le fichier" onPress={onSave} disabled={busy} />
+        {/*
+          L'ouverture passe par le sélecteur du système : c'est lui, et non
+          nous, qui sait quelles apps acceptent un `.jwlibrary`. D'où un
+          libellé qui nomme la destination attendue, et une confirmation qui
+          rappelle ensuite le chemin à suivre dans JW Library.
+        */}
+        <SecondaryButton label="Ouvrir dans JW Library" onPress={onOpenInJwLibrary} disabled={busy} />
         <SecondaryButton label="Partager" onPress={onShare} disabled={busy} />
         {/*
           Ni enregistrer ni partager n'est obligatoire : la fusion est déjà

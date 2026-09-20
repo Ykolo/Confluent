@@ -40,6 +40,22 @@ describe('format', () => {
     expect(fmt.percent(0.425)).toBe('43\u202F%');
   });
 
+  test('le nom affiché après enregistrement reste lisible', () => {
+    const asked = 'Fusion_2026-09-18.jwlibrary';
+
+    // Google Drive : identifiant de document opaque, rien à en tirer.
+    expect(fmt.savedName('acc%3D1%3Bdoc%3DencodedZ0h4aWdRWE5r', asked)).toBe(asked);
+    // Stockage de l'appareil : un chemin encodé, dont le nom se lit.
+    expect(fmt.savedName('primary%3ADownload%2FFusion_2026-09-18.jwlibrary', asked)).toBe(asked);
+    // Renommé par le système pour éviter une collision : on garde son nom.
+    expect(fmt.savedName('primary%3ADownload%2FFusion_2026-09-18%20(1).jwlibrary', asked))
+      .toBe('Fusion_2026-09-18 (1).jwlibrary');
+    // Dossier ordinaire, nom déjà lisible.
+    expect(fmt.savedName(asked, asked)).toBe(asked);
+    // Segment au percent-encodage invalide : on ne lève pas, on se rabat.
+    expect(fmt.savedName('100%', asked)).toBe(asked);
+  });
+
   test('dates relatives', () => {
     const now = new Date(2026, 8, 6);
     expect(fmt.relativeDate(new Date(2026, 8, 6, 9, 41).toISOString(), now)).toBe("Aujourd'hui");

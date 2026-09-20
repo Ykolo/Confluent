@@ -32,6 +32,7 @@ import {
 import * as fmt from './src/format';
 import { addToHistory, loadHistory, type HistoryEntry } from './src/history';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
+import { openInJwLibrary, RESTORE_STEPS } from './src/platform/jw-library';
 import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
 import { color } from './src/theme';
@@ -379,12 +380,25 @@ function Confluent() {
       // `createFile` qui règle les collisions de nom, pas nous.
       const destination = target.createFile(result.fileName, 'application/octet-stream');
       destination.write(await result.file.bytes());
-      setStatus(`Enregistré : ${destination.name}`);
+      setStatus(`Enregistré : ${fmt.savedName(destination.name, result.fileName)}`);
     } catch (err) {
       // Un choix de dossier annulé rejette aussi : rien à signaler dans ce cas.
       if (!isCancellation(err)) setError(surface('enregistrement', err));
     } finally {
       setBusy(false);
+    }
+  }, [result]);
+
+  const openInJw = useCallback(async () => {
+    if (!result) return;
+    setError(null);
+    try {
+      await openInJwLibrary(result.file);
+      // On ne sait pas ce que l'app choisie a fait du fichier — l'intention
+      // ne rend rien. La suite se passe dans JW Library, autant la dire.
+      setStatus(RESTORE_STEPS);
+    } catch (err) {
+      if (!isCancellation(err)) setError(surface('ouverture dans JW Library', err));
     }
   }, [result]);
 
@@ -438,6 +452,7 @@ function Confluent() {
           error={error}
           onDismissError={() => setError(null)}
           onSave={() => void save()}
+          onOpenInJwLibrary={() => void openInJw()}
           onShare={() => void share()}
           onClose={closeSummary}
         />
