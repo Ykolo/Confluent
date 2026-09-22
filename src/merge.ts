@@ -10,9 +10,10 @@
  *
  * Validé sur de vraies sauvegardes iOS + Android, schemaVersion 16.
  */
-import { Unzip, UnzipInflate, unzipSync, zipSync } from 'fflate';
+import { Unzip, UnzipInflate, unzipSync } from 'fflate';
 
 import { AppError, stopwatch, timed } from './errors';
+import { zipEntries, type ZipEntry } from './zip';
 
 // ---------------------------------------------------------------------------
 // Contrats de la couche plateforme
@@ -331,10 +332,15 @@ export async function resolveAttachments(
   return { ...backup, attachments, pendingAttachments: undefined };
 }
 
+/**
+ * Écrit l'archive `.jwlibrary`. `onSlice` suit la compression de la base,
+ * seule étape longue : voir `zip.ts`.
+ */
 export async function writeBackup(
   backup: Backup,
   outputName: string,
   sha256: Sha256,
+  onSlice?: SliceCallback,
 ): Promise<Uint8Array> {
   const lap = stopwatch('archive', outputName);
   const now = new Date();
@@ -355,16 +361,32 @@ export async function writeBackup(
   };
   lap(`SHA-256 de ${backup.database.byteLength} octets`);
 
-  const entries: Record<string, Uint8Array> = {
-    'manifest.json': new TextEncoder().encode(JSON.stringify(manifest)),
-    'userData.db': backup.database,
-    ...backup.attachments,
-  };
+  // Les pièces jointes sont des médias déjà compressés : les passer au
+  // deflate coûtait l'essentiel du temps d'archivage pour un gain nul. Elles
+  // sont rangées telles quelles ; seuls le manifeste et la base se compressent.
+  const entries: ZipEntry[] = [
+    { name: 'manifest.json', data: new TextEncoder().encode(JSON.stringify(manifest)), compress: true },
+    { name: 'userData.db', data: backup.database, compress: true },
+    ...Object.entries(backup.attachments).map(([name, data]) => ({ name, data, compress: false })),
+  ];
 
-  // La recompression est le dernier gros bloc synchrone du parcours : elle
-  // coûte plus cher que la décompression, à cause du niveau 6.
-  const file = zipSync(entries, { level: 6 });
-  lap(`recompression de ${Object.keys(entries).length} entrées → ${file.byteLength} octets`);
+  // Deux chronos distincts dans le journal : si l'archivage reste lent, ils
+  // disent tout de suite si c'est la base ou les pièces jointes.
+  let stored = 0;
+  let storedBytes = 0;
+  const file = await zipEntries(entries, {
+    onSlice,
+    onEntry: (entry) => {
+      if (entry.name === 'userData.db') {
+        lap(`base compressée : ${entry.size} → ${entry.written} octets`);
+      } else if (entry.stored) {
+        stored++;
+        storedBytes += entry.size;
+      }
+    },
+  });
+  lap(`${stored} pièce(s) jointe(s) rangée(s) sans compression (${storedBytes} octets), `
+    + `archive de ${entries.length} entrées → ${file.byteLength} octets`);
   return file;
 }
 
@@ -830,8 +852,9 @@ export async function mergeBackups(
     const fileName = options.outputName
       ?? `UserdataBackup_${new Date().toISOString().slice(0, 10)}_Merged.jwlibrary`;
     await tick('archive', 0, 1);
+    // La compression de la base avance par tranches : la barre la suit.
     const file = await timed('fusion', 'archive écrite',
-      () => writeBackup(merged, fileName, options.sha256));
+      () => writeBackup(merged, fileName, options.sha256, (done, total) => tick('archive', done, total)));
     await tick('archive', 1, 1);
     return { file, report, fileName };
   } finally {
