@@ -43,7 +43,7 @@ nom du fichier produit.
 | `src/platform/sqlite-expo.ts` | `SqliteHost` + SHA-256 pour l'app |
 | `src/platform/sqlite-bun.ts` | Les mêmes, pour `bun test`. Jamais bundlé |
 | `src/backup-info.ts` | Lecture d'une sauvegarde choisie : compteurs des cartes fichier |
-| `src/history.ts` | Historique des fusions, en `AsyncStorage` |
+| `src/history.ts` | Historique des fusions, en `AsyncStorage` ; fichiers produits dans les documents de l’app |
 | `src/theme.ts` | Les jetons du canvas de design : couleurs, rayons, fontes |
 | `src/ui/` | Les trois écrans et leurs briques |
 
@@ -71,7 +71,7 @@ n'importe quel hébergement statique. Sur Vercel : dossier racine `web`.
 | `web/components/Confluent.tsx` | Le pendant d'`App.tsx` : lecture, fusion, téléchargement, partage |
 | `web/components/` | Les trois écrans et leurs briques, en HTML + CSS Modules |
 | `web/lib/sqlite-wasm.ts` | `SqliteHost` + SHA-256 pour le navigateur |
-| `web/lib/history.ts` | Historique des fusions, en `localStorage` |
+| `web/lib/history.ts` | Historique des fusions, en `localStorage` ; fichiers produits en IndexedDB |
 | `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
 
 Deux particularités de l'hôte navigateur :
