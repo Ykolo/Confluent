@@ -32,6 +32,7 @@ nom du fichier produit.
 |---|---|
 | `App.tsx` | Enchaînement des écrans, choix des fichiers, enregistrement, partage |
 | `src/merge.ts` | Le moteur. Ne dépend de rien d'autre que `fflate` |
+| `src/zip.ts` | Écriture de l'archive produite, par tranches |
 | `src/platform/sqlite-expo.ts` | `SqliteHost` + SHA-256 pour l'app |
 | `src/platform/sqlite-bun.ts` | Les mêmes, pour `bun test`. Jamais bundlé |
 | `src/backup-info.ts` | Lecture d'une sauvegarde choisie : compteurs des cartes fichier |
@@ -41,6 +42,42 @@ nom du fichier produit.
 
 Le fichier produit sort en `.jwlibrary` : c'est l'extension que JW Library
 accepte à la restauration.
+
+## La version web
+
+Un site Next.js dans `web/`, déclaré comme workspace Bun : le `bun install` de
+la racine installe l'app et le site. Mêmes trois écrans, et surtout **le même
+moteur** : le site importe `src/merge.ts`, `backup-info.ts`, `errors.ts`,
+`format.ts`, `progress.ts` et `theme.ts` tels quels, par l'alias `@core/*`.
+
+    cd web
+    bun run dev      # http://localhost:3000
+    bun run build    # site statique dans web/out/
+    bun test         # l'hôte WebAssembly, contre celui de Bun
+
+Tout se passe dans le navigateur. Il n'y a pas de serveur (`output: 'export'`),
+les sauvegardes ne sont envoyées nulle part, et `web/out/` se publie sur
+n'importe quel hébergement statique. Sur Vercel : dossier racine `web`.
+
+| Fichier | Rôle |
+|---|---|
+| `web/components/Confluent.tsx` | Le pendant d'`App.tsx` : lecture, fusion, téléchargement, partage |
+| `web/components/` | Les trois écrans et leurs briques, en HTML + CSS Modules |
+| `web/lib/sqlite-wasm.ts` | `SqliteHost` + SHA-256 pour le navigateur |
+| `web/lib/history.ts` | Historique des fusions, en `localStorage` |
+| `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
+
+Deux particularités de l'hôte navigateur :
+
+- **SQLite n'est pas empaqueté.** Turbopack refuse `@sqlite.org/sqlite-wasm`
+  (il y trouve des `new Worker()` aux URL calculées). Le module est donc copié
+  tel quel dans `public/sqlite/` et importé hors bundler. La copie est refaite
+  à chaque `dev` ou `build`, et reste ainsi alignée sur la version installée.
+- **Le WAL passe par `locking_mode=EXCLUSIVE`.** Le VFS en mémoire du module
+  n'a pas de mémoire partagée : une base en mode WAL y échoue sur
+  `SQLITE_CANTOPEN`, avec ou sans journal à côté. En mode exclusif, SQLite
+  tient l'index du WAL dans le tas, et le journal d'une sauvegarde Android est
+  bien intégré. Le pragma doit précéder toute lecture.
 
 ## API
 
@@ -192,8 +229,18 @@ le moteur l'attend : c'est ce qui permet de rendre la main à la boucle
 d'événements (`await new Promise(r => setTimeout(r, 0))`) pour que la barre de
 progression se rafraîchisse réellement. Sans ça l'app paraît figée alors
 qu'elle travaille. Les étapes signalées sont `lieux`, `surlignages`, `notes`,
-`signets` et `vérification` ; `src/progress.ts` les recompose en une seule
-barre.
+`signets`, `vérification` et `archive` ; `src/progress.ts` les recompose en une
+seule barre.
+
+L'archive produite est écrite par `src/zip.ts`, et non par `zipSync`. Seuls le
+manifeste et la base sont compressés : les pièces jointes sont des médias déjà
+compressés (4 % de gain mesuré, pour un tiers du temps d'archivage), elles sont
+rangées telles quelles. La base est compressée par tranches, avec `onProgress`
+entre chacune : c'était le dernier gros bloc synchrone, près de quatre secondes
+d'écran figé sur téléphone. L'enveloppe ZIP est écrite à la main plutôt qu'avec
+le `Zip` en flux de fflate, qui termine chaque entrée par un descripteur de
+données : `ZipInputStream` de Java refuse une entrée rangée suivie d'un tel
+descripteur. Ici les tailles vont dans l'en-tête local, comme avec `zipSync`.
 
 Toute la fusion tient dans une transaction, avec `ROLLBACK` sur erreur, et se
 termine par des `foreign_key_check` et `integrity_check` bloquants. Une base à
