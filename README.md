@@ -13,6 +13,13 @@ Le moteur vit dans `src/merge.ts`. C'est un fichier autonome, sans dépendance
 
     bun test
 
+Les tests tournent sur deux fausses sauvegardes, iPad et Android, fabriquées
+à la volée par `tests/fixtures/backups.ts` sur le schéma réel : c'est ce que
+fait la CI à chaque PR. Pour les rejouer sur de vraies sauvegardes, qui
+restent hors du dépôt :
+
+    CONFLUENT_IPAD=iPad.jwlibrary CONFLUENT_ANDROID=Android.jwlibrary bun test
+
 Validé sur de vraies sauvegardes iOS + Android, `schemaVersion` 16.
 
 ## Pourquoi ce module existe

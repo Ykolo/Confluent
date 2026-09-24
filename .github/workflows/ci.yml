@@ -1,0 +1,47 @@
+# Types, tests et build du site, à chaque PR et à chaque push sur master.
+#
+# Les tests tournent sur les fausses sauvegardes de `tests/fixtures` : les
+# vraies restent sur le poste, hors du dépôt. L'app mobile ne se construit pas
+# ici — un build EAS se lance à la main, quand il y a quelque chose à publier.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Types de l'app
+        run: bun run typecheck
+
+      # Depuis la racine, `bun test` prend aussi ceux de `web/`.
+      - name: Tests
+        run: bun test
+
+      # Le build génère `next-env.d.ts`, que le typecheck du site attend.
+      - name: Build du site
+        working-directory: web
+        run: bun run build
+
+      - name: Types du site
+        working-directory: web
+        run: bun run typecheck

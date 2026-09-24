@@ -14,6 +14,7 @@ import { join } from 'node:path';
 
 import { readBackup } from '../src/merge';
 import { createBunHost } from '../src/platform/sqlite-bun';
+import { androidBackup, ipadBackup } from './fixtures/backups';
 
 const host = createBunHost();
 const scratch = mkdtempSync(join(tmpdir(), 'confluent-wal-'));
@@ -41,20 +42,18 @@ function databaseWithPendingWal() {
 
 describe('readBackup', () => {
   test('expose le journal de la sauvegarde Android au lieu de le jeter', async () => {
-    const android = await readBackup(new Uint8Array(
-      readFileSync('UserdataBackup_2026-09-06_Samsung_SM-S911B.jwlibrary')));
+    const android = await readBackup(androidBackup());
     expect(Object.keys(android.sidecars).sort()).toEqual(['-shm', '-wal']);
     expect(android.sidecars['-wal'].byteLength).toBeGreaterThan(0);
     // Le journal ne doit jamais se retrouver parmi les pièces jointes.
     expect(Object.keys(android.attachments).some((n) => n.includes('userData'))).toBe(false);
 
-    const ios = await readBackup(new Uint8Array(readFileSync('UserdataBackup_2026-09-05_iPad.jwlibrary')));
+    const ios = await readBackup(ipadBackup());
     expect(ios.sidecars).toEqual({});
   });
 
   test('la base Android est en mode WAL', async () => {
-    const { database } = await readBackup(new Uint8Array(
-      readFileSync('UserdataBackup_2026-09-06_Samsung_SM-S911B.jwlibrary')));
+    const { database } = await readBackup(androidBackup());
     // En-tête SQLite : octets 18 et 19, versions d'écriture et de lecture. 2 = WAL.
     expect([database[18], database[19]]).toEqual([2, 2]);
   });
