@@ -1,5 +1,7 @@
 /**
- * Tests sur de vraies sauvegardes iOS + Android, sans simulateur.
+ * Tests sur une sauvegarde iOS et une Android, sans simulateur. Par défaut,
+ * les fausses de `fixtures/backups.ts` ; les vraies, en local, avec
+ * `CONFLUENT_IPAD` et `CONFLUENT_ANDROID`.
  *
  *     bun test
  *
@@ -7,16 +9,13 @@
  * intégrité) attrapent l'essentiel des bugs de remappage d'identifiants.
  */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
 
 import {
   mergeBackups, readBackup, readManifest, resolveAttachments, type MergeReport,
 } from '../src/merge';
 import { createBunHost, sha256Bun } from '../src/platform/sqlite-bun';
-
-const IPAD = 'UserdataBackup_2026-09-05_iPad.jwlibrary';
-const ANDROID = 'UserdataBackup_2026-09-06_Samsung_SM-S911B.jwlibrary';
+import { androidBackup, ipadBackup } from './fixtures/backups';
 
 const host = createBunHost();
 afterAll(() => host.dispose());
@@ -39,10 +38,16 @@ async function tally(zip: Uint8Array, name: string): Promise<Record<string, numb
   }
 }
 
-/** Valeurs d'une colonne, dans la base d'une archive. */
+/**
+ * Valeurs d'une colonne, dans la base d'une archive — journal compris : sans
+ * lui, les lignes d'une sauvegarde Android encore dans le WAL manqueraient à
+ * l'attendu, et le test reprocherait à la fusion de les avoir conservées.
+ */
 async function column(zip: Uint8Array, name: string, sql: string): Promise<Set<string>> {
-  const db = await host.open(name, (await readBackup(zip)).database);
+  const { database, sidecars } = await readBackup(zip);
+  const db = await host.open(name, database, sidecars);
   try {
+    if (Object.keys(sidecars).length > 0) await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     const rows = await db.all<Record<string, unknown>>(sql);
     return new Set(rows.map((r) => String(Object.values(r)[0])));
   } finally {
@@ -56,8 +61,8 @@ let ab: { file: Uint8Array; report: MergeReport; fileName: string };
 let ba: { file: Uint8Array; report: MergeReport; fileName: string };
 
 beforeAll(async () => {
-  a = new Uint8Array(readFileSync(IPAD));
-  b = new Uint8Array(readFileSync(ANDROID));
+  a = ipadBackup();
+  b = androidBackup();
   ab = await mergeBackups(a, b, { host, sha256: sha256Bun, outputName: 'AB.jwlibrary' });
   ba = await mergeBackups(b, a, { host, sha256: sha256Bun, outputName: 'BA.jwlibrary' });
 }, 600_000);
@@ -211,4 +216,18 @@ describe('stratégie de conflit', () => {
     }
     expect(newest.report.noteConflicts).toBe(ab.report.noteConflicts);
   }, 600_000);
+});
+
+// Garde-fou sur les fausses sauvegardes : si elles cessent de provoquer ces
+// cas, les tests ci-dessus passent encore mais ne vérifient plus grand-chose.
+describe.skipIf(!!process.env.CONFLUENT_IPAD)('fausses sauvegardes', () => {
+  test('provoquent conflits, lieux proches et signets déplacés', () => {
+    expect(ab.report.noteConflicts).toBe(2);
+    // doc201 ne diffère de doc200 que par DocumentId : il doit être ajouté.
+    expect(ab.report.added.Location).toBe(1);
+    // Slot 1 déjà pris des deux côtés : un signet est déplacé, aucun perdu.
+    expect(ab.report.added.Bookmark).toBe(1);
+    expect(ab.report.bookmarksSkipped).toBe(0);
+    expect(ab.report.totals).toEqual({ notes: 8, highlights: 160, bookmarks: 3 });
+  });
 });

@@ -9,13 +9,14 @@
  */
 import { afterAll, describe, expect, test } from 'bun:test';
 import { Database } from 'bun:sqlite';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { mergeBackups, readBackup } from '@core/merge';
 import { createBunHost, sha256Bun } from '@core/platform/sqlite-bun';
 
+import { androidBackup, ipadBackup } from '../../tests/fixtures/backups';
 import { createWasmHost, sha256Web } from '../lib/sqlite-wasm';
 
 // Le site charge le module depuis `public/` ; ici, directement depuis le paquet.
@@ -108,17 +109,12 @@ describe('hôte WebAssembly', () => {
   });
 });
 
-// Les vraies sauvegardes restent hors du dépôt (voir .gitignore) : ces tests
-// ne tournent que sur le poste qui les a.
-const root = join(import.meta.dir, '..', '..');
-const IPAD = join(root, 'UserdataBackup_2026-09-05_iPad.jwlibrary');
-const ANDROID = join(root, 'UserdataBackup_2026-09-06_Samsung_SM-S911B.jwlibrary');
-const real = existsSync(IPAD) && existsSync(ANDROID);
-
-describe.skipIf(!real)('sur de vraies sauvegardes', () => {
+// Les fausses sauvegardes de `tests/fixtures`, ou les vraies avec
+// `CONFLUENT_IPAD` et `CONFLUENT_ANDROID`.
+describe('sur une sauvegarde iPad et une Android', () => {
   test('la fusion donne les mêmes totaux dans le navigateur et sous Bun', async () => {
-    const a = new Uint8Array(readFileSync(IPAD));
-    const b = new Uint8Array(readFileSync(ANDROID));
+    const a = ipadBackup();
+    const b = androidBackup();
     const bun = createBunHost();
     try {
       const web = await mergeBackups(a, b, { host: wasmHost, sha256: sha256Web });

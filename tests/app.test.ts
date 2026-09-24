@@ -1,19 +1,19 @@
 /** Ce que l'interface affiche : lecture d'une sauvegarde, formats, avancement. */
 import { afterAll, describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 
 import { inspectBackup } from '../src/backup-info';
 import * as fmt from '../src/format';
 import { createBunHost } from '../src/platform/sqlite-bun';
 import { overallRatio } from '../src/progress';
+import { ipadBackup } from './fixtures/backups';
 
 const host = createBunHost();
 afterAll(() => host.dispose());
 
 describe('inspectBackup', () => {
   test('lit le manifeste et compte ce qu’affiche la carte fichier', async () => {
-    const name = 'UserdataBackup_2026-09-05_iPad.jwlibrary';
-    const info = await inspectBackup(name, new Uint8Array(readFileSync(name)), host);
+    const name = 'UserdataBackup_2026-04-02_iPad.jwlibrary';
+    const info = await inspectBackup(name, ipadBackup(), host);
 
     expect(info.name).toBe(name);
     expect(info.deviceName).toBe('iPad');
