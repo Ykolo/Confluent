@@ -32,6 +32,7 @@ nom du fichier produit.
 |---|---|
 | `App.tsx` | Enchaînement des écrans, choix des fichiers, enregistrement, partage |
 | `src/merge.ts` | Le moteur. Ne dépend de rien d'autre que `fflate` |
+| `src/zip.ts` | Écriture de l'archive produite, par tranches |
 | `src/platform/sqlite-expo.ts` | `SqliteHost` + SHA-256 pour l'app |
 | `src/platform/sqlite-bun.ts` | Les mêmes, pour `bun test`. Jamais bundlé |
 | `src/backup-info.ts` | Lecture d'une sauvegarde choisie : compteurs des cartes fichier |
@@ -228,8 +229,18 @@ le moteur l'attend : c'est ce qui permet de rendre la main à la boucle
 d'événements (`await new Promise(r => setTimeout(r, 0))`) pour que la barre de
 progression se rafraîchisse réellement. Sans ça l'app paraît figée alors
 qu'elle travaille. Les étapes signalées sont `lieux`, `surlignages`, `notes`,
-`signets` et `vérification` ; `src/progress.ts` les recompose en une seule
-barre.
+`signets`, `vérification` et `archive` ; `src/progress.ts` les recompose en une
+seule barre.
+
+L'archive produite est écrite par `src/zip.ts`, et non par `zipSync`. Seuls le
+manifeste et la base sont compressés : les pièces jointes sont des médias déjà
+compressés (4 % de gain mesuré, pour un tiers du temps d'archivage), elles sont
+rangées telles quelles. La base est compressée par tranches, avec `onProgress`
+entre chacune : c'était le dernier gros bloc synchrone, près de quatre secondes
+d'écran figé sur téléphone. L'enveloppe ZIP est écrite à la main plutôt qu'avec
+le `Zip` en flux de fflate, qui termine chaque entrée par un descripteur de
+données : `ZipInputStream` de Java refuse une entrée rangée suivie d'un tel
+descripteur. Ici les tailles vont dans l'en-tête local, comme avec `zipSync`.
 
 Toute la fusion tient dans une transaction, avec `ROLLBACK` sur erreur, et se
 termine par des `foreign_key_check` et `integrity_check` bloquants. Une base à
