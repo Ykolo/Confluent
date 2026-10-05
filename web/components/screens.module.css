@@ -365,6 +365,27 @@
   color: var(--inkSoft);
 }
 
+.entryAction,
+.entryGone {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.entryAction {
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: underline;
+}
+.entryAction:hover { color: var(--inkSoft); }
+
+.entryGone {
+  color: var(--fainter);
+}
+
+.historyNotice {
+  margin-bottom: 16px;
+}
+
 .empty {
   font-size: 15px;
   line-height: 21px;

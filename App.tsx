@@ -5,7 +5,7 @@
  * l'on choisit les deux fichiers, le récapitulatif de la fusion, et
  * l'historique des fusions faites sur l'appareil.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, View,
 } from 'react-native';
@@ -17,7 +17,7 @@ import { InstrumentSans_500Medium } from '@expo-google-fonts/instrument-sans/500
 import { InstrumentSans_600SemiBold } from '@expo-google-fonts/instrument-sans/600SemiBold';
 import { Newsreader_400Regular } from '@expo-google-fonts/newsreader/400Regular';
 import { useFonts } from 'expo-font';
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 // `SafeAreaView` de react-native est déprécié et sera retiré ; celui-ci le
 // remplace et gère en plus l'encoche en paysage. Il lit les marges dans un
@@ -30,7 +30,9 @@ import {
   type ErrorView,
 } from './src/errors';
 import * as fmt from './src/format';
-import { addToHistory, loadHistory, type HistoryEntry } from './src/history';
+import {
+  addToHistory, archivedFile, findArchivedFile, loadHistory, pruneArchive, type HistoryEntry,
+} from './src/history';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
 import { openInJwLibrary, RESTORE_STEPS } from './src/platform/jw-library';
 import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
@@ -47,7 +49,7 @@ type Tab = 'merge' | 'history';
 interface MergeResult {
   report: MergeReport;
   fileName: string;
-  /** Le fichier produit, déjà écrit dans le cache de l'app. */
+  /** Le fichier produit, déjà écrit dans les documents de l'app. */
   file: File;
   size: number;
 }
@@ -56,25 +58,6 @@ const TABS = [
   { value: 'merge', label: 'Fusionner' },
   { value: 'history', label: 'Historique' },
 ] as const;
-
-/** Répertoire de travail : les fichiers produits y attendent d'être enregistrés. */
-function workDirectory(): Directory {
-  const dir = new Directory(Paths.cache, 'fusions');
-  dir.create({ intermediates: true, idempotent: true });
-  return dir;
-}
-
-/**
- * Nom libre dans le répertoire de travail, en suffixant si besoin :
- * `Fusion_2026-09-05_2.jwlibrary`.
- */
-function freeName(dir: Directory, base: string, extension: string): string {
-  for (let i = 1; i < 100; i++) {
-    const name = i === 1 ? `${base}${extension}` : `${base}_${i}${extension}`;
-    if (!new File(dir, name).exists) return name;
-  }
-  return `${base}_${Date.now()}${extension}`;
-}
 
 /**
  * Rend la main à la boucle d'événements, le temps d'un tour.
@@ -318,8 +301,8 @@ function Confluent() {
     let lastTick = Date.now();
 
     try {
-      const dir = workDirectory();
-      const fileName = freeName(dir, `Fusion_${new Date().toISOString().slice(0, 10)}`, '.jwlibrary');
+      const id = `${Date.now()}`;
+      const fileName = `Fusion_${new Date().toISOString().slice(0, 10)}.jwlibrary`;
 
       const merged = await mergeBackups(baseBackup, sourceBackup, {
         host: expoHost,
@@ -339,7 +322,9 @@ function Confluent() {
         },
       });
 
-      const file = new File(dir, fileName);
+      // Écrit directement à sa place dans l'historique : c'est ce même fichier
+      // que le récapitulatif, puis l'historique, enregistrent ou partagent.
+      const file = archivedFile({ id, name: merged.fileName });
       file.create({ overwrite: true });
       file.write(merged.file);
 
@@ -351,7 +336,7 @@ function Confluent() {
       });
 
       const entry: HistoryEntry = {
-        id: `${Date.now()}`,
+        id,
         name: merged.fileName,
         createdAt: new Date().toISOString(),
         sources: `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
@@ -359,7 +344,9 @@ function Confluent() {
         notes: merged.report.totals.notes,
         size: merged.file.byteLength,
       };
-      setHistory(await addToHistory(entry));
+      const next = await addToHistory(entry);
+      pruneArchive(next);
+      setHistory(next);
       logInfo('fusion', `${merged.fileName} — ${merged.report.totals.notes} notes, `
         + `${merged.file.byteLength} octets`);
     } catch (err) {
@@ -370,24 +357,32 @@ function Confluent() {
     }
   }, [fileA, fileB, strategy]);
 
-  const save = useCallback(async () => {
-    if (!result) return;
+  /** Fusions dont le fichier est encore conservé, donc réenregistrable. */
+  const stored = useMemo(
+    () => new Set(history.filter((entry) => findArchivedFile(entry)).map((entry) => entry.id)),
+    [history],
+  );
+
+  // Enregistrer et partager servent au récapitulatif comme à l'historique :
+  // ils prennent le fichier en argument plutôt que de lire `result`.
+  const save = useCallback(async (file: File, fileName: string) => {
     setError(null);
+    setStatus(null);
     try {
       const target = await Directory.pickDirectoryAsync();
       setBusy(true);
       // Le dossier choisi peut être un emplacement SAF sur Android : c'est
       // `createFile` qui règle les collisions de nom, pas nous.
-      const destination = target.createFile(result.fileName, 'application/octet-stream');
-      destination.write(await result.file.bytes());
-      setStatus(`Enregistré : ${fmt.savedName(destination.name, result.fileName)}`);
+      const destination = target.createFile(fileName, 'application/octet-stream');
+      destination.write(await file.bytes());
+      setStatus(`Enregistré : ${fmt.savedName(destination.name, fileName)}`);
     } catch (err) {
       // Un choix de dossier annulé rejette aussi : rien à signaler dans ce cas.
       if (!isCancellation(err)) setError(surface('enregistrement', err));
     } finally {
       setBusy(false);
     }
-  }, [result]);
+  }, []);
 
   const openInJw = useCallback(async () => {
     if (!result) return;
@@ -402,9 +397,9 @@ function Confluent() {
     }
   }, [result]);
 
-  const share = useCallback(async () => {
-    if (!result) return;
+  const share = useCallback(async (file: File, fileName: string) => {
     setError(null);
+    setStatus(null);
     try {
       if (!await Sharing.isAvailableAsync()) {
         setError({
@@ -415,15 +410,36 @@ function Confluent() {
         });
         return;
       }
-      await Sharing.shareAsync(result.file.uri, {
+      await Sharing.shareAsync(file.uri, {
         mimeType: 'application/octet-stream',
         UTI: 'public.data',
-        dialogTitle: result.fileName,
+        dialogTitle: fileName,
       });
     } catch (err) {
       if (!isCancellation(err)) setError(surface('partage', err));
     }
-  }, [result]);
+  }, []);
+
+  /** Le fichier d'une fusion passée, ou une erreur qui dit qu'il n'est plus là. */
+  const pastFile = useCallback((entry: HistoryEntry): File | null => {
+    const file = findArchivedFile(entry);
+    if (!file) {
+      setStatus(null);
+      setError({
+        title: 'Fichier introuvable',
+        message: 'Le fichier de cette fusion n’est plus conservé sur l’appareil.',
+        hint: 'Relancer la fusion à partir des deux sauvegardes d’origine.',
+        technical: `aucun fichier pour l’entrée ${entry.id} (${entry.name})`,
+      });
+    }
+    return file;
+  }, []);
+
+  const switchTab = useCallback((next: Tab) => {
+    setTab(next);
+    setStatus(null);
+    setError(null);
+  }, []);
 
   const closeSummary = useCallback(() => {
     setResult(null);
@@ -451,9 +467,9 @@ function Confluent() {
           status={status}
           error={error}
           onDismissError={() => setError(null)}
-          onSave={() => void save()}
+          onSave={() => void save(result.file, result.fileName)}
           onOpenInJwLibrary={() => void openInJw()}
-          onShare={() => void share()}
+          onShare={() => void share(result.file, result.fileName)}
           onClose={closeSummary}
         />
       ) : (
@@ -475,11 +491,26 @@ function Confluent() {
                 onMerge={() => void merge()}
               />
             ) : (
-              <HistoryScreen entries={history} />
+              <HistoryScreen
+                entries={history}
+                stored={stored}
+                busy={busy}
+                status={status}
+                error={error}
+                onDismissError={() => setError(null)}
+                onSave={(entry) => {
+                  const file = pastFile(entry);
+                  if (file) void save(file, entry.name);
+                }}
+                onShare={(entry) => {
+                  const file = pastFile(entry);
+                  if (file) void share(file, entry.name);
+                }}
+              />
             )}
           </View>
           <View style={styles.tabs}>
-            <Segmented options={TABS} value={tab} onChange={setTab} variant="tabs" disabled={busy} />
+            <Segmented options={TABS} value={tab} onChange={switchTab} variant="tabs" disabled={busy} />
           </View>
         </>
       )}

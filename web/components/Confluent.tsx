@@ -17,7 +17,7 @@ import * as fmt from '@core/format';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
 import { overallRatio } from '@core/progress';
 
-import { addToHistory, loadHistory, type HistoryEntry } from '@/lib/history';
+import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type HistoryEntry } from '@/lib/history';
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';
 
 import { HistoryScreen } from './HistoryScreen';
@@ -58,6 +58,18 @@ function outputName(): string {
 }
 
 /** Vrai si le navigateur sait partager un fichier (menu de partage du téléphone). */
+/** Fait télécharger un fichier par le navigateur. */
+function triggerDownload(file: Blob, name: string): void {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  // Le téléchargement a déjà pris sa copie : libérer l'URL tout de suite
+  // l'interromprait sur certains navigateurs, d'où le délai.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function canShareFiles(file: File): boolean {
   try {
     return typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
@@ -88,9 +100,12 @@ export function Confluent() {
   const [shareable, setShareable] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  /** Fusions dont le fichier est encore conservé, donc retéléchargeable. */
+  const [stored, setStored] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setHistory(loadHistory());
+    void storedFiles().then(setStored);
     // Le module SQLite pèse près d'un mégaoctet : autant qu'il arrive pendant
     // que l'utilisateur cherche ses fichiers.
     wasmHost.preload();
@@ -170,8 +185,9 @@ export function Confluent() {
       setResult({ report: merged.report, fileName: merged.fileName, file });
       setShareable(canShareFiles(file));
 
+      const id = `${Date.now()}`;
       setHistory(addToHistory({
-        id: `${Date.now()}`,
+        id,
         name: merged.fileName,
         createdAt: new Date().toISOString(),
         sources: `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
@@ -180,6 +196,10 @@ export function Confluent() {
         size: file.size,
       }));
       logInfo('fusion', `${merged.fileName} — ${merged.report.totals.notes} notes, ${file.size} octets`);
+      // Le fichier est déjà prêt à télécharger : sa copie pour l'historique se
+      // fait à côté, et son échec (quota, navigation privée) ne coûte que le
+      // retéléchargement.
+      void storeFile(id, file).then(setStored, (err) => logError('historique', err));
     } catch (err) {
       setError(logError('fusion', err));
     } finally {
@@ -190,16 +210,37 @@ export function Confluent() {
 
   const download = useCallback(() => {
     if (!result) return;
-    const url = URL.createObjectURL(result.file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = result.fileName;
-    link.click();
-    // Le téléchargement a déjà pris sa copie : libérer l'URL tout de suite
-    // l'interromprait sur certains navigateurs, d'où le délai.
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    triggerDownload(result.file, result.fileName);
     setStatus(`Téléchargé : ${result.fileName}`);
   }, [result]);
+
+  const downloadPast = useCallback(async (entry: HistoryEntry) => {
+    setError(null);
+    setStatus(null);
+    try {
+      const file = await loadFile(entry.id);
+      if (!file) {
+        setStored(await storedFiles());
+        setError({
+          title: 'Fichier introuvable',
+          message: 'Le fichier de cette fusion n’est plus conservé dans ce navigateur.',
+          hint: 'Relancer la fusion à partir des deux sauvegardes d’origine.',
+          technical: `aucun fichier pour l’entrée ${entry.id} dans IndexedDB`,
+        });
+        return;
+      }
+      triggerDownload(file, entry.name);
+      setStatus(`Téléchargé : ${entry.name}`);
+    } catch (err) {
+      setError(logError('téléchargement', err));
+    }
+  }, []);
+
+  const switchTab = useCallback((next: Tab) => {
+    setTab(next);
+    setStatus(null);
+    setError(null);
+  }, []);
 
   const share = useCallback(async () => {
     if (!result) return;
@@ -253,11 +294,18 @@ export function Confluent() {
                 onMerge={() => void merge()}
               />
             ) : (
-              <HistoryScreen entries={history} />
+              <HistoryScreen
+                entries={history}
+                stored={stored}
+                status={status}
+                error={error}
+                onDismissError={() => setError(null)}
+                onDownload={(entry) => void downloadPast(entry)}
+              />
             )}
           </div>
           <nav className={s.tabs}>
-            <Segmented label="Sections" options={TABS} value={tab} onChange={setTab} variant="tabs" disabled={busy} />
+            <Segmented label="Sections" options={TABS} value={tab} onChange={switchTab} variant="tabs" disabled={busy} />
           </nav>
         </>
       )}
