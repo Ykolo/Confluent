@@ -13,3 +13,9 @@ web/out/
 web/next-env.d.ts
 *.tsbuildinfo
 web/public/sqlite/
+
+# Secrets : URL Neon, clés R2, secret Better Auth. Seuls les modèles sont commités.
+.env
+.env.*
+!.env.example
+.vercel/
