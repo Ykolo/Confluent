@@ -7,6 +7,7 @@
  * les fusions et le client HTTP.
  */
 import type { BackupCounts } from '../backup-info';
+import type { ConflictStrategy, MergeReport } from '../merge';
 
 export type Slot = 'a' | 'b';
 
@@ -44,6 +45,34 @@ export interface BackupDto {
 export interface Slots {
   a: BackupDto | null;
   b: BackupDto | null;
+}
+
+/** Une fusion enregistrée et confirmée. */
+export interface MergeDto {
+  id: string;
+  /** Nom du fichier produit, celui sous lequel il se télécharge. */
+  fileName: string;
+  size: number;
+  sha256: string;
+  /** Les sauvegardes d'origine, telles que l'historique les affiche (« iPad + Pixel »). */
+  sources: string;
+  strategy: ConflictStrategy;
+  report: MergeReport;
+  /** Date de l'enregistrement, ISO 8601. */
+  createdAt: string;
+}
+
+/** Une page de `GET /api/merges`, du plus récent au plus ancien. */
+export interface MergePage {
+  items: MergeDto[];
+  /** À repasser en `?cursor=` pour la page suivante ; absent sur la dernière. */
+  next?: string;
+}
+
+/** Réponse de `GET /api/files/:kind/:id`. */
+export interface DownloadLink {
+  /** URL présignée, valable 5 minutes, qui enregistre le fichier sous son nom. */
+  url: string;
 }
 
 /** Corps d'une réponse d'erreur de l'API. */
