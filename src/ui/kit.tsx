@@ -4,8 +4,8 @@
  */
 import { useState, type ReactNode } from 'react';
 import {
-  Pressable, StyleSheet, Text, View,
-  type StyleProp, type TextStyle, type ViewStyle,
+  Pressable, StyleSheet, Text, TextInput, View,
+  type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 
 import type { ErrorView } from '../errors';
@@ -74,6 +74,48 @@ export function DashedButton(props: { label: ReactNode; onPress?: () => void; di
       pressed={styles.dashedPressed}
       labelStyle={styles.dashedLabel}
     />
+  );
+}
+
+/** Lien souligné : « Continuer sans compte », « Se déconnecter ». */
+export function TextLink({ label, onPress, disabled, small }: {
+  label: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  small?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [disabled && styles.disabled, pressed && styles.linkPressed]}
+    >
+      <Text style={[styles.link, small && styles.linkSmall]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** Champ de formulaire avec son libellé. */
+export function TextField({ label, hint, ...input }: { label: string; hint?: string } & Pick<TextInputProps,
+  'value' | 'onChangeText' | 'secureTextEntry' | 'autoComplete' | 'textContentType' | 'keyboardType'
+  | 'autoCapitalize' | 'autoCorrect' | 'editable' | 'onSubmitEditing' | 'returnKeyType' | 'autoFocus'>) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        {...input}
+        accessibilityLabel={label}
+        placeholderTextColor={color.fainter}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[styles.input, focused && styles.inputFocused, input.editable === false && styles.disabled]}
+      />
+      {hint && <Text style={styles.fieldHint}>{hint}</Text>}
+    </View>
   );
 }
 
@@ -204,6 +246,32 @@ const styles = StyleSheet.create({
   },
 
   disabled: { opacity: 0.5 },
+
+  link: {
+    fontFamily: font.sansMedium,
+    fontSize: 14,
+    color: color.muted,
+    textDecorationLine: 'underline',
+    textAlign: 'center',
+  },
+  linkSmall: { fontSize: 13 },
+  linkPressed: { opacity: 0.6 },
+
+  field: { gap: 6 },
+  fieldLabel: { fontFamily: font.sansMedium, fontSize: 13, color: color.muted },
+  input: {
+    fontFamily: font.sans,
+    fontSize: 16,
+    color: color.ink,
+    backgroundColor: color.card,
+    borderWidth: 1,
+    borderColor: color.outline,
+    borderRadius: radius.button,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  inputFocused: { borderColor: color.accent },
+  fieldHint: { fontFamily: font.sans, fontSize: 12, lineHeight: 17, color: color.fainter },
 
   primary: {
     backgroundColor: color.accent,
