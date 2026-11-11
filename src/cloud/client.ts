@@ -56,7 +56,8 @@ export interface CloudClient {
 export interface CloudClientOptions {
   /** Adresse du serveur, sans `/` final : `https://confluent-web.vercel.app`. */
   baseUrl: string;
-  fetch: typeof fetch;
+  /** Le `fetch` de la plateforme ; seule cette forme d'appel est utilisée. */
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
   /**
    * En-têtes ajoutés aux appels de l'API, relus à chaque requête : l'app y
    * met `Cookie`, que la session peut avoir renouvelé entre deux appels.
