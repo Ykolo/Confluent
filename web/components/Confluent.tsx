@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { inspectBackup, type BackupInfo } from '@core/backup-info';
+import type { BackupDto } from '@core/cloud/types';
 import { isCancellation, logError, logInfo, stopwatch, type ErrorView } from '@core/errors';
 import * as fmt from '@core/format';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
@@ -19,18 +20,34 @@ import { overallRatio } from '@core/progress';
 
 import { signOut, useSession } from '@/lib/auth-client';
 import { describeAuthError } from '@/lib/auth-errors';
+import { cloud } from '@/lib/cloud';
 import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type HistoryEntry } from '@/lib/history';
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';
 
 import { AccountScreen } from './AccountScreen';
 import { HistoryScreen } from './HistoryScreen';
-import { HomeScreen } from './HomeScreen';
+import { HomeScreen, type CloudLine } from './HomeScreen';
 import { Segmented } from './kit';
 import s from './screens.module.css';
 import { SummaryScreen } from './SummaryScreen';
 
 type Slot = 'a' | 'b';
 type Tab = 'merge' | 'history';
+
+const SLOTS = ['a', 'b'] as const;
+
+/** D'où vient la sauvegarde à lire dans un emplacement. */
+interface ReadSource {
+  name: string;
+  /** Pour le journal et l'erreur : « choix du fichier », « récupération depuis le compte ». */
+  what: string;
+  firstStep: string;
+  open: () => Promise<Uint8Array>;
+  /** Ce que la carte peut montrer avant même d'avoir les octets. */
+  outline?: BackupInfo;
+}
+
+const NO_REMOTE: Record<Slot, BackupDto | null> = { a: null, b: null };
 
 interface MergeResult {
   report: MergeReport;
@@ -160,23 +177,31 @@ export function Confluent() {
     wasmHost.preload();
   }, []);
 
-  const read = useCallback(async (slot: Slot, picked: File) => {
+  /**
+   * Lit une sauvegarde dans un emplacement, qu'elle vienne d'un fichier local
+   * ou du compte. Renvoie ce que montre la carte, ou `null` si la lecture a
+   * échoué (l'erreur est déjà affichée).
+   */
+  const read = useCallback(async (slot: Slot, source: ReadSource): Promise<BackupInfo | null> => {
     setError(null);
     setBusy(true);
-    setReading({ slot, step: 'ouverture du fichier' });
+    setReading({ slot, step: source.firstStep });
     const show = slot === 'a' ? setFileA : setFileB;
     const lap = stopwatch('choix', `fichier ${slot.toUpperCase()}`);
     // L'ancienne sauvegarde ne doit pas survivre à un remplacement raté : la
     // carte montrerait l'une, la fusion prendrait l'autre.
     backups.current[slot] = null;
-    show(null);
+    show(source.outline ?? null);
 
     try {
-      const bytes = new Uint8Array(await picked.arrayBuffer());
+      // Les octets bruts ne vivent que le temps de cette fonction : une fois
+      // la sauvegarde décompressée, garder aussi l'archive doublerait le pic
+      // de mémoire, surtout après un téléchargement.
+      const bytes = await source.open();
       lap(`archive de ${bytes.byteLength} octets en mémoire`);
 
       let lastBreath = Date.now();
-      const info = await inspectBackup(picked.name, bytes, wasmHost, {
+      const info = await inspectBackup(source.name, bytes, wasmHost, {
         onOutline: (outline) => {
           show(outline);
           lap('manifeste lu, carte affichée');
@@ -194,17 +219,115 @@ export function Confluent() {
       });
 
       backups.current[slot] = info.backup;
-      show({ ...info, backup: null });
+      const shown = { ...info, backup: null };
+      show(shown);
       lap(`prêt : ${info.counts?.notes} notes, ${info.counts?.highlights} surlignages, `
         + `${info.counts?.bookmarks} favoris`);
+      return shown;
     } catch (err) {
       show(null);
-      setError(logError(`choix du fichier ${slot.toUpperCase()}`, err));
+      setError(logError(`${source.what} ${slot.toUpperCase()}`, err));
+      return null;
     } finally {
       setReading(null);
       setBusy(false);
     }
   }, []);
+
+  // --- Synchronisation des emplacements, quand un compte est connecté ---
+
+  const userId = session.data?.user.id ?? null;
+  /** La sauvegarde du compte qui correspond au fichier affiché dans chaque emplacement. */
+  const [remote, setRemote] = useState<Record<Slot, BackupDto | null>>(NO_REMOTE);
+  const [uploading, setUploading] = useState<Record<Slot, boolean>>({ a: false, b: false });
+  const [keepInAccount, setKeepInAccount] = useState(true);
+  /**
+   * Numéro du dernier choix par emplacement : un envoi qui se termine après un
+   * nouveau choix ne doit pas rattacher l'ancien fichier à la carte.
+   */
+  const picks = useRef<Record<Slot, number>>({ a: 0, b: 0 });
+
+  // À la connexion : reprendre les emplacements du compte. Un emplacement déjà
+  // rempli localement est laissé tel quel, c'est le choix de l'utilisateur.
+  useEffect(() => {
+    setRemote(NO_REMOTE);
+    if (!userId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const slots = await cloud.slots();
+        for (const slot of SLOTS) {
+          const dto = slots[slot];
+          if (cancelled || !dto || backups.current[slot]) continue;
+          const pick = ++picks.current[slot];
+          setRemote((r) => ({ ...r, [slot]: dto }));
+          const info = await read(slot, {
+            name: dto.name,
+            what: 'récupération depuis le compte, emplacement',
+            firstStep: 'téléchargement depuis le compte',
+            open: () => cloud.downloadBackup(dto),
+            outline: {
+              name: dto.name, size: dto.size, deviceName: dto.deviceName,
+              createdAt: dto.backupCreatedAt, counts: null, backup: null,
+            },
+          });
+          if (!info && picks.current[slot] === pick) setRemote((r) => ({ ...r, [slot]: null }));
+        }
+      } catch (err) {
+        if (!cancelled) setError(logError('synchronisation des emplacements', err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, read]);
+
+  /** Dépose en tâche de fond le fichier qu'on vient de lire. */
+  const keepRemotely = useCallback(async (slot: Slot, picked: File, info: BackupInfo, pick: number) => {
+    setUploading((u) => ({ ...u, [slot]: true }));
+    try {
+      const sha256 = await sha256Web(new Uint8Array(await picked.arrayBuffer()));
+      const dto = await cloud.uploadBackup(slot, info, picked, sha256);
+      if (picks.current[slot] === pick) setRemote((r) => ({ ...r, [slot]: dto }));
+      logInfo('synchronisation', `${info.name} déposé en ${slot.toUpperCase()}`);
+    } catch (err) {
+      setError(logError(`dépôt dans le compte, emplacement ${slot.toUpperCase()}`, err));
+    } finally {
+      if (picks.current[slot] === pick) setUploading((u) => ({ ...u, [slot]: false }));
+    }
+  }, []);
+
+  /** Choix d'un fichier local : lecture, puis dépôt dans le compte si demandé. */
+  const pickLocal = useCallback(async (slot: Slot, picked: File) => {
+    const pick = ++picks.current[slot];
+    setRemote((r) => ({ ...r, [slot]: null }));
+    setUploading((u) => ({ ...u, [slot]: false }));
+    const info = await read(slot, {
+      name: picked.name,
+      what: 'choix du fichier',
+      firstStep: 'ouverture du fichier',
+      open: async () => new Uint8Array(await picked.arrayBuffer()),
+    });
+    if (info && userId && keepInAccount && picks.current[slot] === pick) {
+      void keepRemotely(slot, picked, info, pick);
+    }
+  }, [read, userId, keepInAccount, keepRemotely]);
+
+  const removeRemote = useCallback(async (slot: Slot) => {
+    setError(null);
+    try {
+      await cloud.clearSlot(slot);
+      setRemote((r) => ({ ...r, [slot]: null }));
+    } catch (err) {
+      setError(logError(`retrait du compte, emplacement ${slot.toUpperCase()}`, err));
+    }
+  }, []);
+
+  const cloudLine = (slot: Slot): CloudLine | null => {
+    if (uploading[slot]) return { text: 'Envoi vers le compte…' };
+    const dto = remote[slot];
+    if (!dto) return null;
+    const from = dto.uploadedFrom ? `Déposé depuis ${dto.uploadedFrom}` : 'Dans le compte';
+    return { text: `${from} · ${fmt.timeAgo(dto.createdAt)}`, onRemove: () => void removeRemote(slot) };
+  };
 
   const merge = useCallback(async () => {
     const baseBackup = backups.current.a;
@@ -347,9 +470,14 @@ export function Confluent() {
                 progress={progress}
                 error={error}
                 onDismissError={() => setError(null)}
-                onFile={(slot, file) => void read(slot, file)}
+                onFile={(slot, file) => void pickLocal(slot, file)}
                 onStrategyChange={setStrategy}
                 onMerge={() => void merge()}
+                sync={userId ? {
+                  lines: { a: cloudLine('a'), b: cloudLine('b') },
+                  keepInAccount,
+                  onKeepChange: setKeepInAccount,
+                } : undefined}
               />
             ) : (
               <HistoryScreen

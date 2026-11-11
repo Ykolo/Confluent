@@ -443,3 +443,35 @@
   gap: 16px;
   margin-top: 26px;
 }
+
+/* --- Emplacements synchronisés : ligne du compte sous la carte, case à cocher --- */
+
+.cloudRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 4px 0;
+}
+.cloudText {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--faint);
+}
+
+.keep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--inkSoft);
+  cursor: pointer;
+}
+.keep input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}

@@ -70,3 +70,16 @@ export function relativeDate(iso: string, now = new Date()): string {
   const label = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
   return d.getFullYear() === now.getFullYear() ? label : `${label} ${d.getFullYear()}`;
 }
+
+/**
+ * Ancienneté courte, pour un dépôt : « à l'instant », « il y a 5 min »,
+ * « il y a 2 h », « hier », puis la date (« le 21 juin »).
+ */
+export function timeAgo(iso: string, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  if (minutes < 24 * 60) return `il y a ${Math.floor(minutes / 60)} h`;
+  const day = relativeDate(iso, now);
+  return day === 'Hier' ? 'hier' : `le ${day}`;
+}

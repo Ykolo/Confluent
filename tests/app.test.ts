@@ -56,6 +56,16 @@ describe('format', () => {
     expect(fmt.savedName('100%', asked)).toBe(asked);
   });
 
+  test('ancienneté d’un dépôt', () => {
+    const now = new Date(2026, 8, 6, 15, 0);
+    const before = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
+    expect(fmt.timeAgo(before(0), now)).toBe('à l’instant');
+    expect(fmt.timeAgo(before(5), now)).toBe('il y a 5 min');
+    expect(fmt.timeAgo(before(125), now)).toBe('il y a 2 h');
+    expect(fmt.timeAgo(new Date(2026, 8, 5, 9, 0).toISOString(), now)).toBe('hier');
+    expect(fmt.timeAgo(new Date(2026, 5, 21).toISOString(), now)).toBe('le 21 juin');
+  });
+
   test('dates relatives', () => {
     const now = new Date(2026, 8, 6);
     expect(fmt.relativeDate(new Date(2026, 8, 6, 9, 41).toISOString(), now)).toBe("Aujourd'hui");

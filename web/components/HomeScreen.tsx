@@ -21,13 +21,22 @@ const STRATEGIES = [
   { value: 'newest', label: 'Version récente' },
 ] as const satisfies readonly { value: ConflictStrategy; label: string }[];
 
-function FileSlot({ label, info, onFile, disabled, step }: {
+/** Ce que le compte sait d'un emplacement, affiché sous sa carte. */
+export interface CloudLine {
+  /** « Déposé depuis Chrome sur Windows · il y a 2 h », « Envoi vers le compte… ». */
+  text: string;
+  /** Présent quand l'emplacement est occupé dans le compte : le vider. */
+  onRemove?: () => void;
+}
+
+function FileSlot({ label, info, onFile, disabled, step, cloud }: {
   label: string;
   info: BackupInfo | null;
   onFile: (file: File) => void;
   disabled?: boolean;
   /** Phase de lecture en cours, tant que les compteurs manquent. */
   step?: string | null;
+  cloud?: CloudLine | null;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -108,10 +117,22 @@ function FileSlot({ label, info, onFile, disabled, step }: {
     </Card>
   );
 
-  if (!info.counts) return <div aria-busy>{card}</div>;
+  // Hors du bouton de la carte : un bouton ne peut pas en contenir un autre.
+  const cloudRow = cloud && (
+    <div className={s.cloudRow}>
+      <span className={s.cloudText}>{cloud.text}</span>
+      {cloud.onRemove && (
+        <button type="button" className={s.accountLink} onClick={cloud.onRemove} disabled={disabled}>
+          Retirer du compte
+        </button>
+      )}
+    </div>
+  );
+
+  if (!info.counts) return <div aria-busy>{card}{cloudRow}</div>;
 
   return (
-    <>
+    <div>
       {picker}
       <button
         type="button"
@@ -123,7 +144,8 @@ function FileSlot({ label, info, onFile, disabled, step }: {
       >
         {card}
       </button>
-    </>
+      {cloudRow}
+    </div>
   );
 }
 
@@ -141,11 +163,20 @@ export interface HomeScreenProps {
   onFile: (slot: Slot, file: File) => void;
   onStrategyChange: (value: ConflictStrategy) => void;
   onMerge: () => void;
+  /**
+   * Synchronisation, quand un compte est connecté ; absente sinon, et l'écran
+   * reste alors exactement celui d'avant les comptes.
+   */
+  sync?: {
+    lines: Record<Slot, CloudLine | null>;
+    keepInAccount: boolean;
+    onKeepChange: (keep: boolean) => void;
+  };
 }
 
 export function HomeScreen({
   fileA, fileB, strategy, busy, reading, progress, error,
-  onDismissError, onFile, onStrategyChange, onMerge,
+  onDismissError, onFile, onStrategyChange, onMerge, sync,
 }: HomeScreenProps) {
   // Une carte qui n'affiche encore que son manifeste n'a pas de base à
   // fusionner : le bouton reste inerte tant que les deux lectures ne sont pas
@@ -170,6 +201,7 @@ export function HomeScreen({
             onFile={(file) => { setReplacing(false); onFile('a', file); }}
             disabled={busy}
             step={reading?.slot === 'a' ? reading.step : null}
+            cloud={sync?.lines.a}
           />
           <PlusRule />
           <FileSlot
@@ -178,6 +210,7 @@ export function HomeScreen({
             onFile={(file) => { setReplacing(false); onFile('b', file); }}
             disabled={busy}
             step={reading?.slot === 'b' ? reading.step : null}
+            cloud={sync?.lines.b}
           />
           {ready && (replacing ? (
             <div className={s.replaceHint}>
@@ -189,8 +222,22 @@ export function HomeScreen({
           ))}
         </div>
 
+        {sync && (
+          <label className={s.keep}>
+            <input
+              type="checkbox"
+              checked={sync.keepInAccount}
+              onChange={(e) => sync.onKeepChange(e.target.checked)}
+              disabled={busy}
+            />
+            <span>Garder aussi dans le compte les fichiers choisis</span>
+          </label>
+        )}
+
         <p className={s.privacy}>
-          Les sauvegardes sont lues et fusionnées dans ce navigateur : elles ne sont envoyées nulle part.
+          {sync
+            ? 'Les sauvegardes sont lues et fusionnées dans ce navigateur. Celles gardées dans le compte y sont aussi déposées, pour les retrouver sur tes autres appareils.'
+            : 'Les sauvegardes sont lues et fusionnées dans ce navigateur : elles ne sont envoyées nulle part.'}
         </p>
       </div>
 
