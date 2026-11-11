@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun scripts/copy-sqlite.ts && next dev",
     "build": "bun scripts/copy-sqlite.ts && next build",
-    "vercel-build": "prisma migrate deploy && bun run build",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then prisma migrate deploy; fi && bun run build",
     "start": "next start",
     "postinstall": "prisma generate",
     "test": "bun test",
