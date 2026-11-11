@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 
 import type { ErrorView } from '@core/errors';
 
@@ -24,8 +24,24 @@ interface ButtonProps {
   disabled?: boolean;
 }
 
-export function PrimaryButton({ label, onClick, disabled }: ButtonProps) {
-  return <button type="button" className={s.primary} onClick={onClick} disabled={disabled}>{label}</button>;
+/** `submit` dans un formulaire, pour que la touche Entrée le valide. */
+export function PrimaryButton({ label, onClick, disabled, type = 'button' }: ButtonProps & { type?: 'button' | 'submit' }) {
+  return <button type={type} className={s.primary} onClick={onClick} disabled={disabled}>{label}</button>;
+}
+
+/** Champ de formulaire avec son libellé. */
+export function TextField({ label, hint, ...input }: {
+  label: string;
+  hint?: string;
+} & Pick<InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'value' | 'onChange' | 'autoComplete' | 'required' | 'minLength' | 'disabled' | 'name' | 'inputMode' | 'autoFocus'>) {
+  return (
+    <label className={s.field}>
+      <span className={s.fieldLabel}>{label}</span>
+      <input className={s.input} {...input} />
+      {hint && <span className={s.fieldHint}>{hint}</span>}
+    </label>
+  );
 }
 
 export function SecondaryButton({ label, onClick, disabled }: ButtonProps) {

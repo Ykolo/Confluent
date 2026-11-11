@@ -407,3 +407,39 @@
     padding-bottom: 16px;
   }
 }
+
+/* --- Compte : barre discrète au-dessus de l'écran, et écran de connexion --- */
+
+.account {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 12px 26px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.accountEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.accountLink {
+  flex: none;
+  padding: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.accountLink:not(:disabled):hover { color: var(--inkSoft); }
+.accountLink:disabled { opacity: 0.5; }
+
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 26px;
+}
