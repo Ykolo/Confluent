@@ -59,12 +59,16 @@ moteur** : le site importe `src/merge.ts`, `backup-info.ts`, `errors.ts`,
 
     cd web
     bun run dev      # http://localhost:3000
-    bun run build    # site statique dans web/out/
+    bun run build    # build Next dans web/.next/
+    bun run start    # sert ce build, http://localhost:3000
     bun test         # l'hôte WebAssembly, contre celui de Bun
 
-Tout se passe dans le navigateur. Il n'y a pas de serveur (`output: 'export'`),
-les sauvegardes ne sont envoyées nulle part, et `web/out/` se publie sur
-n'importe quel hébergement statique. Sur Vercel : dossier racine `web`.
+La fusion se fait toujours dans le navigateur : la page est un composant
+client, et les sauvegardes ne partent nulle part pendant une fusion. Le site
+est pourtant un serveur Next, pas un export statique : c'est lui qui portera
+les comptes et la synchronisation (`app/api/*`). `GET /api/health` répond
+`{"status":"ok"}` tant qu'il tourne. Sur Vercel : dossier racine `web`,
+préréglage Next.js, sans dossier de sortie forcé.
 
 | Fichier | Rôle |
 |---|---|

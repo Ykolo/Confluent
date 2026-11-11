@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun scripts/copy-sqlite.ts && next dev",
     "build": "bun scripts/copy-sqlite.ts && next build",
+    "start": "next start",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
