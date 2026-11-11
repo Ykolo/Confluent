@@ -9,7 +9,6 @@ dist/
 
 # Site web (Next.js)
 web/.next/
-web/out/
 web/next-env.d.ts
 *.tsbuildinfo
 web/public/sqlite/
