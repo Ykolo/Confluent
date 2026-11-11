@@ -8,7 +8,7 @@
 import { beforeAll, describe, expect, mock, test } from 'bun:test';
 import { z } from 'zod';
 
-import type { Backup } from '@/generated/prisma/client';
+import type { Backup, Merge } from '@/generated/prisma/client';
 
 mock.module('server-only', () => ({}));
 
@@ -56,6 +56,51 @@ describe('toBackupDto', () => {
   test('refuse une ligne non confirmée', () => {
     expect(() => api.toBackupDto(row({ status: 'pending' }))).toThrow('non confirmée');
     expect(() => api.toBackupDto(row({ name: null }))).toThrow('non confirmée');
+  });
+});
+
+describe('fusions', () => {
+  const report = {
+    added: { Note: 2 }, duplicates: 52, noteConflicts: 2, bookmarksSkipped: 0,
+    totals: { notes: 8, highlights: 160, bookmarks: 3 },
+  };
+  const merge = (over: Partial<Merge> = {}): Merge => ({
+    id: 'm1',
+    userId: 'u1',
+    objectKey: 'merges/u1/m1.jwlibrary',
+    size: 99,
+    sha256: 'b'.repeat(64),
+    fileName: 'Fusion.jwlibrary',
+    sources: 'iPad + Pixel',
+    strategy: 'keep_both',
+    report,
+    status: 'ready',
+    createdAt: new Date('2026-11-11T10:00:00Z'),
+    ...over,
+  });
+
+  test('stratégie : tiret côté moteur, souligné côté base', () => {
+    expect(api.strategyToDb('keep-both')).toBe('keep_both');
+    expect(api.strategyToDb('newest')).toBe('newest');
+    expect(api.strategyFromDb('keep_both')).toBe('keep-both');
+    expect(api.strategyFromDb('newest')).toBe('newest');
+  });
+
+  test('toMergeDto : convertit la stratégie et ne fuit rien', () => {
+    expect(api.toMergeDto(merge())).toEqual({
+      id: 'm1', fileName: 'Fusion.jwlibrary', size: 99, sha256: 'b'.repeat(64), sources: 'iPad + Pixel',
+      strategy: 'keep-both', report, createdAt: '2026-11-11T10:00:00.000Z',
+    });
+  });
+
+  test('toMergeDto : refuse une fusion non confirmée', () => {
+    expect(() => api.toMergeDto(merge({ status: 'pending' }))).toThrow('non confirmée');
+    expect(() => api.toMergeDto(merge({ report: null }))).toThrow('non confirmée');
+  });
+
+  test('le schéma du rapport rejette un compteur négatif', () => {
+    expect(api.mergeReportSchema.safeParse(report).success).toBe(true);
+    expect(api.mergeReportSchema.safeParse({ ...report, duplicates: -1 }).success).toBe(false);
   });
 });
 

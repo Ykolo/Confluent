@@ -9,9 +9,10 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import type { ApiError, BackupDto, Slot } from '@core/cloud/types';
+import type { ApiError, BackupDto, MergeDto, Slot } from '@core/cloud/types';
+import type { ConflictStrategy, MergeReport } from '@core/merge';
 
-import type { Backup } from '@/generated/prisma/client';
+import type { Backup, Merge, Strategy } from '@/generated/prisma/client';
 
 export function apiError(status: number, error: string, message: string): Response {
   return Response.json({ error, message } satisfies ApiError, { status });
@@ -57,6 +58,41 @@ export function toBackupDto(row: Backup): BackupDto {
     backupCreatedAt: row.backupCreatedAt.toISOString(),
     counts: (row.counts as BackupDto['counts']) ?? null,
     uploadedFrom: row.uploadedFrom,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Prisma refuse le tiret dans une valeur d'enum : `keep_both` en base,
+ * `'keep-both'` dans le moteur et sur le réseau.
+ */
+export const strategyToDb = (s: ConflictStrategy): Strategy => (s === 'keep-both' ? 'keep_both' : 'newest');
+export const strategyFromDb = (s: Strategy): ConflictStrategy => (s === 'keep_both' ? 'keep-both' : 'newest');
+
+const count = z.number().int().nonnegative();
+
+/** Le `MergeReport` du moteur, tel que le client l'envoie. */
+export const mergeReportSchema: z.ZodType<MergeReport> = z.object({
+  added: z.record(z.string().max(64), count),
+  duplicates: count,
+  noteConflicts: count,
+  bookmarksSkipped: count,
+  totals: z.object({ notes: count, highlights: count, bookmarks: count }),
+});
+
+/** Une fusion `ready` en DTO. */
+export function toMergeDto(row: Merge): MergeDto {
+  if (row.status !== 'ready' || !row.fileName || row.sources === null || !row.strategy || !row.report) {
+    throw new Error(`merge ${row.id} : DTO demandé pour une ligne non confirmée`);
+  }
+  return {
+    id: row.id,
+    fileName: row.fileName,
+    size: row.size,
+    sha256: row.sha256,
+    sources: row.sources,
+    strategy: strategyFromDb(row.strategy),
+    report: row.report as unknown as MergeReport,
     createdAt: row.createdAt.toISOString(),
   };
 }
