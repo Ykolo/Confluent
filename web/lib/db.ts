@@ -15,9 +15,10 @@ import { PrismaNeon } from '@prisma/adapter-neon';
 import { PrismaClient } from '@/generated/prisma/client';
 
 function create() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error('DATABASE_URL manque : voir web/.env.example.');
-  return new PrismaClient({ adapter: new PrismaNeon({ connectionString }) });
+  // Pas d'erreur ici si `DATABASE_URL` manque : `next build` importe les routes
+  // sans les variables d'environnement (en CI notamment). L'adaptateur n'ouvre
+  // son pool qu'à la première requête, qui échoue alors clairement.
+  return new PrismaClient({ adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL }) });
 }
 
 // En développement, chaque rechargement à chaud réévalue ce module : on garde

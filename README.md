@@ -79,6 +79,7 @@ préréglage Next.js, sans dossier de sortie forcé.
 | `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
 | `web/prisma/schema.prisma` | Comptes (Better Auth), sauvegardes déposées et fusions : métadonnées seulement, les fichiers vivent dans R2 |
 | `web/lib/db.ts` | Client Prisma du serveur, sur l'adaptateur Neon (URL poolée) |
+| `web/lib/auth.ts` | Comptes (Better Auth) : e-mail et mot de passe, plugin Expo pour l'app, `requireUser()` pour les routes |
 | `web/lib/r2.ts` | Fichiers dans Cloudflare R2 : clés, URL présignées d'envoi et de téléchargement, vérification, suppression |
 
 La base est un Postgres Neon : branche `dev` en local, `main` en production.
