@@ -65,6 +65,12 @@ export interface CloudClientOptions {
   headers?: () => Record<string, string> | Promise<Record<string, string>>;
   /** L'appareil d'où partent les dépôts, montré dans les emplacements (« iPhone »). */
   uploadedFrom?: string;
+  /**
+   * `include` (défaut) : le navigateur joint son cookie de session. L'app
+   * passe `omit` et fournit le cookie par `headers` : la pile réseau native
+   * garde ses propres cookies, qui viendraient sinon s'y mêler.
+   */
+  credentials?: RequestCredentials;
 }
 
 /** Erreur d'un appel à l'API ou à R2, rédigée pour l'écran. */
@@ -150,7 +156,7 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        credentials: 'include',
+        credentials: opts.credentials ?? 'include',
       });
     } catch (err) {
       throw networkError(what, err);
