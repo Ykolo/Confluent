@@ -72,9 +72,10 @@ model Merge {
 }
 
 // --- Better Auth -------------------------------------------------------------
-// Les quatre modèles du noyau de Better Auth, tels que les produit
-// `@better-auth/cli generate` (YKO-41 les régénère et compare). Ils sont posés
-// dès maintenant parce que `Backup` et `Merge` pointent vers `User`.
+// Les tables de Better Auth 1.7, conformes à ses définitions (`getAuthTables`
+// de `better-auth/db`, vérifié pour YKO-41) : le noyau, plus `rateLimit` parce
+// que la limitation de débit est stockée en base (voir `lib/auth.ts`). Le
+// plugin `expo()` n'ajoute pas de table.
 
 model User {
   id            String    @id
@@ -139,4 +140,14 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  // Horodatage en millisecondes : il dépasse la capacité d'un Int.
+  lastRequest BigInt
+
+  @@map("rateLimit")
 }
