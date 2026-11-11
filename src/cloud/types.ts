@@ -62,6 +62,16 @@ export interface MergeDto {
   createdAt: string;
 }
 
+/** Ce que le client envoie pour enregistrer une fusion (`POST /api/merges/:id/confirm`). */
+export interface MergeMeta {
+  fileName: string;
+  report: MergeReport;
+  sources: string;
+  strategy: ConflictStrategy;
+  /** Les sauvegardes déposées qui ont servi : leurs emplacements seront libérés. */
+  backupIds: string[];
+}
+
 /** Une page de `GET /api/merges`, du plus récent au plus ancien. */
 export interface MergePage {
   items: MergeDto[];

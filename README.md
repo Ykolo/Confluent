@@ -46,6 +46,7 @@ nom du fichier produit.
 | `src/history.ts` | Historique des fusions, en `AsyncStorage` ; fichiers produits dans les documents de l’app |
 | `src/theme.ts` | Les jetons du canvas de design : couleurs, rayons, fontes |
 | `src/ui/` | Les trois écrans et leurs briques |
+| `src/cloud/` | Client de l'API de synchronisation, partagé par l'app et le site : types échangés (DTO) et `createCloudClient`, sans dépendance de plateforme |
 
 Le fichier produit sort en `.jwlibrary` : c'est l'extension que JW Library
 accepte à la restauration.
