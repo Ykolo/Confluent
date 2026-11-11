@@ -224,3 +224,36 @@
   overflow-wrap: anywhere;
   user-select: text;
 }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldLabel {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--muted);
+}
+.input {
+  width: 100%;
+  padding: 15px 16px;
+  font: inherit;
+  font-size: 16px; /* 16 px au moins : Safari iOS ne zoome pas sur le champ. */
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-button);
+  transition: border-color 120ms;
+}
+.input:hover:not(:disabled) { border-color: var(--faint); }
+.input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+.input:disabled { opacity: 0.6; }
+.fieldHint {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--fainter);
+}

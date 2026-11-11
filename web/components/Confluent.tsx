@@ -17,9 +17,12 @@ import * as fmt from '@core/format';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
 import { overallRatio } from '@core/progress';
 
+import { signOut, useSession } from '@/lib/auth-client';
+import { describeAuthError } from '@/lib/auth-errors';
 import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type HistoryEntry } from '@/lib/history';
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';
 
+import { AccountScreen } from './AccountScreen';
 import { HistoryScreen } from './HistoryScreen';
 import { HomeScreen } from './HomeScreen';
 import { Segmented } from './kit';
@@ -78,6 +81,36 @@ function canShareFiles(file: File): boolean {
   }
 }
 
+/**
+ * Le compte, en une ligne discrète au-dessus de l'écran : il reste facultatif.
+ * Rien ne s'affiche tant que la session n'est pas connue, pour ne pas faire
+ * clignoter « Se connecter » chez quelqu'un qui l'est déjà.
+ */
+function AccountBar({ email, pending, disabled, onSignIn, onSignOut }: {
+  email: string | null;
+  pending: boolean;
+  disabled: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
+  if (pending) return <div className={s.account} />;
+  return (
+    <div className={s.account}>
+      {email ? (
+        <>
+          <span className={s.accountEmail} title={email}>{email}</span>
+          <span aria-hidden>·</span>
+          <button type="button" className={s.accountLink} onClick={onSignOut} disabled={disabled}>Se déconnecter</button>
+        </>
+      ) : (
+        <button type="button" className={s.accountLink} onClick={onSignIn} disabled={disabled}>
+          Se connecter pour synchroniser
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Confluent() {
   const [tab, setTab] = useState<Tab>('merge');
   const [fileA, setFileA] = useState<BackupInfo | null>(null);
@@ -102,6 +135,22 @@ export function Confluent() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   /** Fusions dont le fichier est encore conservé, donc retéléchargeable. */
   const [stored, setStored] = useState<Set<string>>(new Set());
+
+  const session = useSession();
+  const [accountOpen, setAccountOpen] = useState(false);
+
+  const logout = useCallback(async () => {
+    setError(null);
+    try {
+      const { error: failure } = await signOut();
+      if (failure) {
+        const view = describeAuthError(failure);
+        setError(logError('déconnexion', new Error(view.technical), view));
+      }
+    } catch (err) {
+      setError(logError('déconnexion', err, describeAuthError({ message: String(err) })));
+    }
+  }, []);
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -276,8 +325,17 @@ export function Confluent() {
           onShare={shareable ? () => void share() : undefined}
           onClose={closeSummary}
         />
+      ) : accountOpen ? (
+        <AccountScreen onDone={() => setAccountOpen(false)} />
       ) : (
         <>
+          <AccountBar
+            email={session.data?.user.email ?? null}
+            pending={session.isPending}
+            disabled={busy}
+            onSignIn={() => { setError(null); setAccountOpen(true); }}
+            onSignOut={() => void logout()}
+          />
           <div className={s.content}>
             {tab === 'merge' ? (
               <HomeScreen
