@@ -1,7 +1,7 @@
 /** Les erreurs de Better Auth, telles que l'écran de connexion les affiche. */
 import { describe, expect, test } from 'bun:test';
 
-import { describeAuthError, MIN_PASSWORD } from '../lib/auth-errors';
+import { describeAuthError, MIN_PASSWORD } from '../src/auth-errors';
 
 describe('describeAuthError', () => {
   test('identifiants faux : message en français, l’anglais dans le détail', () => {

@@ -6,7 +6,7 @@
  * message en anglais : on traduit le code, et le message part dans le détail
  * technique.
  */
-import type { ErrorView } from '@core/errors';
+import type { ErrorView } from './errors';
 
 /** Ce que les appels du client Better Auth renvoient dans `error`. */
 export interface AuthFailure {

@@ -19,7 +19,7 @@ import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } fr
 import { overallRatio } from '@core/progress';
 
 import { signOut, useSession } from '@/lib/auth-client';
-import { describeAuthError } from '@/lib/auth-errors';
+import { describeAuthError } from '@core/auth-errors';
 import { cloud } from '@/lib/cloud';
 import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type HistoryEntry } from '@/lib/history';
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';

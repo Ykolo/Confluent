@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, View,
+  ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, Text, View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 // Import par graisse : la racine de ces paquets réexporte toutes les variantes,
@@ -37,10 +37,13 @@ import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } fr
 import { openInJwLibrary, RESTORE_STEPS } from './src/platform/jw-library';
 import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
-import { color } from './src/theme';
+import { color, font } from './src/theme';
+import { signOut, useSession } from './src/auth-client';
+import { describeAuthError } from './src/auth-errors';
+import { AccountScreen } from './src/ui/AccountScreen';
 import { HistoryScreen } from './src/ui/HistoryScreen';
 import { HomeScreen } from './src/ui/HomeScreen';
-import { Segmented } from './src/ui/kit';
+import { Segmented, TextLink } from './src/ui/kit';
 import { SummaryScreen } from './src/ui/SummaryScreen';
 
 type Slot = 'a' | 'b';
@@ -447,6 +450,23 @@ function Confluent() {
     setError(null);
   }, []);
 
+  // Le compte, facultatif : une ligne discrète au-dessus de l'écran.
+  const session = useSession();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const logout = useCallback(async () => {
+    setError(null);
+    try {
+      const { error: failure } = await signOut();
+      if (failure) {
+        const view = describeAuthError(failure);
+        setError(logError('déconnexion', new Error(view.technical), view));
+      }
+    } catch (err) {
+      setError(logError('déconnexion', err, describeAuthError({ message: String(err) })));
+    }
+  }, []);
+  const email = session.data?.user.email ?? null;
+
   if (!fontsLoaded) {
     return (
       <SafeAreaView style={[styles.root, styles.centered]}>
@@ -472,8 +492,26 @@ function Confluent() {
           onShare={() => void share(result.file, result.fileName)}
           onClose={closeSummary}
         />
+      ) : accountOpen ? (
+        <AccountScreen onDone={() => setAccountOpen(false)} />
       ) : (
         <>
+          {/* Rien tant que la session n'est pas connue : pas de clignotement. */}
+          <View style={styles.account}>
+            {!session.isPending && (email ? (
+              <>
+                <Text style={styles.accountEmail} numberOfLines={1}>{email}</Text>
+                <TextLink small label="Se déconnecter" onPress={() => void logout()} disabled={busy} />
+              </>
+            ) : (
+              <TextLink
+                small
+                label="Se connecter pour synchroniser"
+                onPress={() => { setError(null); setAccountOpen(true); }}
+                disabled={busy}
+              />
+            ))}
+          </View>
           <View style={styles.content}>
             {tab === 'merge' ? (
               <HomeScreen
@@ -530,5 +568,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.screen },
   centered: { alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1 },
+  account: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 10,
+    minHeight: 30,
+    paddingHorizontal: 26,
+    paddingTop: 10,
+  },
+  accountEmail: { flexShrink: 1, fontFamily: font.sans, fontSize: 13, color: color.muted },
   tabs: { paddingHorizontal: 26, paddingTop: 10, paddingBottom: 8 },
 });

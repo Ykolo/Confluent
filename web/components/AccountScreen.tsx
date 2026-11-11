@@ -12,7 +12,7 @@ import { useState, type FormEvent } from 'react';
 import { logError, type ErrorView } from '@core/errors';
 
 import { signIn, signUp } from '@/lib/auth-client';
-import { describeAuthError, MIN_PASSWORD } from '@/lib/auth-errors';
+import { describeAuthError, MIN_PASSWORD } from '@core/auth-errors';
 
 import { ErrorNotice, Eyebrow, PrimaryButton, Segmented, TextButton, TextField } from './kit';
 import s from './screens.module.css';
