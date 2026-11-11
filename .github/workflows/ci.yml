@@ -37,6 +37,13 @@ jobs:
       - name: Tests
         run: bun test
 
+      # Le client Prisma (`web/generated/`) n'est pas commité : le build et les
+      # types du site en ont besoin. Le postinstall le génère déjà ; l'étape le
+      # rend explicite et garantit qu'il part du schéma de ce commit.
+      - name: Client Prisma
+        working-directory: web
+        run: bunx prisma generate
+
       # Le build génère `next-env.d.ts`, que le typecheck du site attend.
       - name: Build du site
         working-directory: web

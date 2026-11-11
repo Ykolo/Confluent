@@ -9,6 +9,8 @@ dist/
 
 # Site web (Next.js)
 web/.next/
+# Client Prisma, régénéré par `prisma generate` (postinstall).
+web/generated/
 web/next-env.d.ts
 *.tsbuildinfo
 web/public/sqlite/
