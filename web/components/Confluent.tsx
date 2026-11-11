@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { inspectBackup, type BackupInfo } from '@core/backup-info';
-import type { BackupDto } from '@core/cloud/types';
+import type { BackupDto, MergeDto, MergeMeta, MergePage } from '@core/cloud/types';
 import { isCancellation, logError, logInfo, stopwatch, type ErrorView } from '@core/errors';
 import * as fmt from '@core/format';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
@@ -29,7 +29,7 @@ import { HistoryScreen } from './HistoryScreen';
 import { HomeScreen, type CloudLine } from './HomeScreen';
 import { Segmented } from './kit';
 import s from './screens.module.css';
-import { SummaryScreen } from './SummaryScreen';
+import { SummaryScreen, type CloudSave } from './SummaryScreen';
 
 type Slot = 'a' | 'b';
 type Tab = 'merge' | 'history';
@@ -329,6 +329,91 @@ export function Confluent() {
     return { text: `${from} · ${fmt.timeAgo(dto.createdAt)}`, onRemove: () => void removeRemote(slot) };
   };
 
+  // --- Enregistrement des fusions et historique du compte ---
+
+  const [cloudSave, setCloudSave] = useState<CloudSave | null>(null);
+  /** La dernière fusion à enregistrer, gardée pour « Réessayer ». */
+  const pendingSave = useRef<{ file: File; meta: MergeMeta; sha256: string } | null>(null);
+  /** Historique du compte : `null` tant qu'il n'est pas chargé. */
+  const [remoteHistory, setRemoteHistory] = useState<MergePage | null>(null);
+  const [historyMore, setHistoryMore] = useState(false);
+
+  const saveToAccount = useCallback(async () => {
+    const job = pendingSave.current;
+    if (!job) return;
+    setCloudSave({ state: 'saving' });
+    try {
+      const saved = await cloud.saveMerge(job.file, job.meta, job.sha256);
+      if (pendingSave.current !== job) return;
+      setCloudSave({ state: 'saved' });
+      // Le serveur a libéré les emplacements consommés : la page suit.
+      setRemote((r) => ({
+        a: r.a && job.meta.backupIds.includes(r.a.id) ? null : r.a,
+        b: r.b && job.meta.backupIds.includes(r.b.id) ? null : r.b,
+      }));
+      setRemoteHistory((h) => (h ? { ...h, items: [saved, ...h.items] } : h));
+      logInfo('synchronisation', `${saved.fileName} enregistrée dans le compte`);
+    } catch (err) {
+      if (pendingSave.current !== job) return;
+      setCloudSave({
+        state: 'error',
+        error: logError('enregistrement de la fusion', err),
+        onRetry: () => void saveToAccount(),
+      });
+    }
+  }, []);
+
+  const loadRemoteHistory = useCallback(async (cursor?: string) => {
+    if (cursor) setHistoryMore(true);
+    try {
+      const page = await cloud.merges(cursor);
+      setRemoteHistory((h) => (cursor && h ? { items: [...h.items, ...page.items], next: page.next } : page));
+    } catch (err) {
+      setError(logError('historique du compte', err));
+      if (!cursor) setRemoteHistory({ items: [] });
+    } finally {
+      setHistoryMore(false);
+    }
+  }, []);
+
+  // L'historique du compte suit l'utilisateur : rechargé à l'ouverture de
+  // l'onglet (une fusion a pu être faite ailleurs), oublié à la déconnexion.
+  useEffect(() => {
+    if (!userId) { setRemoteHistory(null); return; }
+    if (tab === 'history') {
+      setRemoteHistory(null);
+      void loadRemoteHistory();
+    }
+  }, [userId, tab, loadRemoteHistory]);
+
+  const downloadRemote = useCallback(async (merge: MergeDto) => {
+    setError(null);
+    setStatus(null);
+    try {
+      const url = await cloud.downloadUrl('merge', merge.id);
+      // L'URL présignée porte `Content-Disposition: attachment` : le
+      // navigateur télécharge sans quitter la page.
+      const link = document.createElement('a');
+      link.href = url;
+      link.click();
+      setStatus(`Téléchargé : ${merge.fileName}`);
+    } catch (err) {
+      setError(logError('téléchargement depuis le compte', err));
+    }
+  }, []);
+
+  const deleteRemote = useCallback(async (merge: MergeDto) => {
+    setError(null);
+    setStatus(null);
+    try {
+      await cloud.deleteMerge(merge.id);
+      setRemoteHistory((h) => (h ? { ...h, items: h.items.filter((m) => m.id !== merge.id) } : h));
+      setStatus(`Supprimée : ${merge.fileName}`);
+    } catch (err) {
+      setError(logError('suppression d’une fusion', err));
+    }
+  }, []);
+
   const merge = useCallback(async () => {
     const baseBackup = backups.current.a;
     const sourceBackup = backups.current.b;
@@ -357,13 +442,37 @@ export function Confluent() {
       setResult({ report: merged.report, fileName: merged.fileName, file });
       setShareable(canShareFiles(file));
 
+      const sources = `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
+        + ` + ${fileB.deviceName} ${fmt.dayMonth(fileB.createdAt)}`;
+
+      // Connecté : enregistrement dans le compte en tâche de fond. Le
+      // téléchargement, lui, est déjà possible.
+      if (userId) {
+        pendingSave.current = {
+          file,
+          sha256: await sha256Web(merged.file),
+          meta: {
+            fileName: merged.fileName,
+            report: merged.report,
+            sources,
+            strategy,
+            // Les sauvegardes du compte qui ont servi : leurs emplacements
+            // seront libérés, s'ils les contiennent encore.
+            backupIds: SLOTS.flatMap((slot) => (remote[slot] ? [remote[slot]!.id] : [])),
+          },
+        };
+        void saveToAccount();
+      } else {
+        pendingSave.current = null;
+        setCloudSave(null);
+      }
+
       const id = `${Date.now()}`;
       setHistory(addToHistory({
         id,
         name: merged.fileName,
         createdAt: new Date().toISOString(),
-        sources: `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
-          + ` + ${fileB.deviceName} ${fmt.dayMonth(fileB.createdAt)}`,
+        sources,
         notes: merged.report.totals.notes,
         size: file.size,
       }));
@@ -378,7 +487,7 @@ export function Confluent() {
       setBusy(false);
       setProgress(null);
     }
-  }, [fileA, fileB, strategy]);
+  }, [fileA, fileB, strategy, userId, remote, saveToAccount]);
 
   const download = useCallback(() => {
     if (!result) return;
@@ -447,6 +556,7 @@ export function Confluent() {
           onDownload={download}
           onShare={shareable ? () => void share() : undefined}
           onClose={closeSummary}
+          cloudSave={userId ? cloudSave : null}
         />
       ) : accountOpen ? (
         <AccountScreen onDone={() => setAccountOpen(false)} />
@@ -487,6 +597,14 @@ export function Confluent() {
                 error={error}
                 onDismissError={() => setError(null)}
                 onDownload={(entry) => void downloadPast(entry)}
+                remote={userId ? {
+                  items: remoteHistory?.items ?? null,
+                  hasMore: !!remoteHistory?.next,
+                  loadingMore: historyMore,
+                  onMore: () => void loadRemoteHistory(remoteHistory?.next),
+                  onDownload: (m) => void downloadRemote(m),
+                  onDelete: (m) => void deleteRemote(m),
+                } : undefined}
               />
             )}
           </div>

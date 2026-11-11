@@ -5,7 +5,7 @@ import type { ErrorView } from '@core/errors';
 import * as fmt from '@core/format';
 import type { MergeReport } from '@core/merge';
 
-import { Card, ErrorNotice, Eyebrow, PrimaryButton, SecondaryButton, TextButton } from './kit';
+import { Card, ErrorNotice, Eyebrow, PrimaryButton, SecondaryButton, Spinner, TextButton } from './kit';
 import s from './screens.module.css';
 
 export interface SummaryScreenProps {
@@ -22,10 +22,33 @@ export interface SummaryScreenProps {
   onDismissError: () => void;
   onDownload: () => void;
   onClose: () => void;
+  /** Enregistrement dans le compte, quand un compte est connecté. */
+  cloudSave?: CloudSave | null;
+}
+
+export type CloudSave =
+  | { state: 'saving' }
+  | { state: 'saved' }
+  | { state: 'error'; error: ErrorView; onRetry: () => void };
+
+/** Où en est l'enregistrement de la fusion dans le compte. */
+function CloudSaveLine({ save }: { save: CloudSave }) {
+  if (save.state === 'saving') {
+    return <p className={s.cloudSave}><Spinner /> Enregistrement dans ton compte…</p>;
+  }
+  if (save.state === 'saved') {
+    return <p className={`${s.cloudSave} ${s.cloudSaved}`}>✓ Enregistré dans ton compte</p>;
+  }
+  return (
+    <div className={s.cloudSaveError}>
+      <ErrorNotice error={save.error} />
+      <SecondaryButton label="Réessayer l’enregistrement" onClick={save.onRetry} />
+    </div>
+  );
 }
 
 export function SummaryScreen({
-  report, fileName, fileSize, busy, status, error, onDismissError, onDownload, onShare, onClose,
+  report, fileName, fileSize, busy, status, error, onDismissError, onDownload, onShare, onClose, cloudSave,
 }: SummaryScreenProps) {
   // Les trois premières lignes sont celles de la maquette ; les suivantes
   // n'apparaissent que lorsqu'elles ont quelque chose à dire.
@@ -75,6 +98,7 @@ export function SummaryScreen({
           <Eyebrow>Fichier obtenu</Eyebrow>
           <p className={s.outputName}>{fileName}</p>
           <p className={s.meta}>{fmt.size(fileSize)} · prêt à réimporter dans votre bibliothèque</p>
+          {cloudSave && <CloudSaveLine save={cloudSave} />}
         </div>
 
         {/*
