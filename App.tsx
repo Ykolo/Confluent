@@ -31,7 +31,8 @@ import {
 } from './src/errors';
 import * as fmt from './src/format';
 import {
-  addToHistory, archivedFile, findArchivedFile, loadHistory, pruneArchive, type HistoryEntry,
+  addToHistory, archivedFile, findArchivedFile, fromMergeDto, loadHistory, pruneArchive, remoteCopy,
+  type HistoryEntry,
 } from './src/history';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
 import { openInJwLibrary, RESTORE_STEPS } from './src/platform/jw-library';
@@ -39,14 +40,14 @@ import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
 import { color, font } from './src/theme';
 import { signOut, useSession } from './src/auth-client';
-import type { BackupDto } from './src/cloud/types';
+import type { BackupDto, MergeMeta, MergePage } from './src/cloud/types';
 import { cloud } from './src/platform/cloud-expo';
 import { describeAuthError } from './src/auth-errors';
 import { AccountScreen } from './src/ui/AccountScreen';
 import { HistoryScreen } from './src/ui/HistoryScreen';
 import { HomeScreen, type CloudLine } from './src/ui/HomeScreen';
 import { Segmented, TextLink } from './src/ui/kit';
-import { SummaryScreen } from './src/ui/SummaryScreen';
+import { SummaryScreen, type CloudSave } from './src/ui/SummaryScreen';
 
 type Slot = 'a' | 'b';
 type Tab = 'merge' | 'history';
@@ -422,6 +423,39 @@ function Confluent() {
     ]);
   }, [pick]);
 
+  // --- Enregistrement de la fusion dans le compte ---
+
+  const [cloudSave, setCloudSave] = useState<CloudSave | null>(null);
+  const [remoteHistory, setRemoteHistory] = useState<MergePage | null>(null);
+  const [historyMore, setHistoryMore] = useState(false);
+  /** La dernière fusion à enregistrer, gardée pour « Réessayer ». Le fichier est déjà sur le disque. */
+  const pendingSave = useRef<{ file: File; meta: MergeMeta; sha256: string } | null>(null);
+
+  const saveToAccount = useCallback(async () => {
+    const job = pendingSave.current;
+    if (!job) return;
+    setCloudSave({ state: 'saving' });
+    try {
+      const saved = await timed('synchronisation', `enregistrement de ${job.meta.fileName}`,
+        async () => cloud.saveMerge(await job.file.bytes(), job.meta, job.sha256));
+      if (pendingSave.current !== job) return;
+      setCloudSave({ state: 'saved' });
+      // Le serveur a libéré les emplacements consommés : l'écran suit.
+      setRemote((r) => ({
+        a: r.a && job.meta.backupIds.includes(r.a.id) ? null : r.a,
+        b: r.b && job.meta.backupIds.includes(r.b.id) ? null : r.b,
+      }));
+      setRemoteHistory((h) => (h ? { ...h, items: [saved, ...h.items] } : h));
+    } catch (err) {
+      if (pendingSave.current !== job) return;
+      setCloudSave({
+        state: 'error',
+        error: surface('enregistrement de la fusion dans le compte', err),
+        onRetry: () => void saveToAccount(),
+      });
+    }
+  }, []);
+
   const merge = useCallback(async () => {
     // Les deux sauvegardes doivent être entièrement lues : tant qu'une carte
     // n'affiche que son manifeste, il n'y a pas de base à fusionner.
@@ -469,12 +503,36 @@ function Confluent() {
         size: merged.file.byteLength,
       });
 
+      const sources = `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
+        + ` + ${fileB.deviceName} ${fmt.dayMonth(fileB.createdAt)}`;
+
+      // Connecté : enregistrement dans le compte en tâche de fond. Le partage
+      // et l'enregistrement local, eux, sont possibles tout de suite.
+      if (sync.current.userId) {
+        pendingSave.current = {
+          file,
+          sha256: await sha256Expo(merged.file),
+          meta: {
+            fileName: merged.fileName,
+            report: merged.report,
+            sources,
+            strategy,
+            // Les sauvegardes du compte qui ont servi : leurs emplacements
+            // seront libérés, s'ils les contiennent encore.
+            backupIds: SLOTS.flatMap((slot) => (remote[slot] ? [remote[slot]!.id] : [])),
+          },
+        };
+        void saveToAccount();
+      } else {
+        pendingSave.current = null;
+        setCloudSave(null);
+      }
+
       const entry: HistoryEntry = {
         id,
         name: merged.fileName,
         createdAt: new Date().toISOString(),
-        sources: `${fileA.deviceName} ${fmt.dayMonth(fileA.createdAt)}`
-          + ` + ${fileB.deviceName} ${fmt.dayMonth(fileB.createdAt)}`,
+        sources,
         notes: merged.report.totals.notes,
         size: merged.file.byteLength,
       };
@@ -489,7 +547,8 @@ function Confluent() {
       setBusy(false);
       setProgress(null);
     }
-  }, [fileA, fileB, strategy]);
+  }, [fileA, fileB, strategy, remote, saveToAccount]);
+
 
   /** Fusions dont le fichier est encore conservé, donc réenregistrable. */
   const stored = useMemo(
@@ -552,6 +611,84 @@ function Confluent() {
     } catch (err) {
       if (!isCancellation(err)) setError(surface('partage', err));
     }
+  }, []);
+
+  // --- Historique du compte ---
+
+
+  const loadRemoteHistory = useCallback(async (cursor?: string) => {
+    if (cursor) setHistoryMore(true);
+    try {
+      const page = await cloud.merges(cursor);
+      setRemoteHistory((h) => (cursor && h ? { items: [...h.items, ...page.items], next: page.next } : page));
+    } catch (err) {
+      setError(surface('historique du compte', err));
+      if (!cursor) setRemoteHistory({ items: [] });
+    } finally {
+      setHistoryMore(false);
+    }
+  }, []);
+
+  // Rechargé à chaque ouverture de l'onglet : une fusion a pu être faite
+  // ailleurs. Oublié à la déconnexion.
+  useEffect(() => {
+    if (!userId) { setRemoteHistory(null); return; }
+    if (tab === 'history') {
+      setRemoteHistory(null);
+      void loadRemoteHistory();
+    }
+  }, [userId, tab, loadRemoteHistory]);
+
+  /**
+   * Télécharge le fichier d'une fusion du compte dans le cache, puis ouvre le
+   * menu de partage : c'est par là qu'il rejoint JW Library pour la
+   * restauration.
+   */
+  const downloadAndShare = useCallback(async (entry: HistoryEntry) => {
+    if (!entry.remoteId) return;
+    setError(null);
+    setStatus(null);
+    setBusy(true);
+    let file: File;
+    try {
+      const url = await cloud.downloadUrl('merge', entry.remoteId);
+      const target = remoteCopy(entry);
+      if (target.exists) target.delete();
+      file = await timed('historique', `téléchargement de ${entry.name}`,
+        () => File.downloadFileAsync(url, target));
+    } catch (err) {
+      setError(surface('téléchargement depuis le compte', err));
+      return;
+    } finally {
+      setBusy(false);
+    }
+    await share(file, entry.name);
+  }, [share]);
+
+  const deleteRemote = useCallback((entry: HistoryEntry) => {
+    if (!entry.remoteId) return;
+    Alert.alert(
+      'Supprimer cette fusion ?',
+      `${entry.name} sera retirée de ton compte, sur tous tes appareils.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => void (async () => {
+            setError(null);
+            setStatus(null);
+            try {
+              await cloud.deleteMerge(entry.remoteId!);
+              setRemoteHistory((h) => (h ? { ...h, items: h.items.filter((m) => m.id !== entry.remoteId) } : h));
+              setStatus(`Supprimée : ${entry.name}`);
+            } catch (err) {
+              setError(surface('suppression d’une fusion', err));
+            }
+          })(),
+        },
+      ],
+    );
   }, []);
 
   /** Le fichier d'une fusion passée, ou une erreur qui dit qu'il n'est plus là. */
@@ -621,6 +758,7 @@ function Confluent() {
           onOpenInJwLibrary={() => void openInJw()}
           onShare={() => void share(result.file, result.fileName)}
           onClose={closeSummary}
+          cloudSave={userId ? cloudSave : null}
         />
       ) : accountOpen ? (
         <AccountScreen onDone={() => setAccountOpen(false)} />
@@ -665,7 +803,7 @@ function Confluent() {
               />
             ) : (
               <HistoryScreen
-                entries={history}
+                entries={userId ? (remoteHistory?.items ?? []).map(fromMergeDto) : history}
                 stored={stored}
                 busy={busy}
                 status={status}
@@ -679,6 +817,14 @@ function Confluent() {
                   const file = pastFile(entry);
                   if (file) void share(file, entry.name);
                 }}
+                remote={userId ? {
+                  loading: remoteHistory === null,
+                  hasMore: !!remoteHistory?.next,
+                  loadingMore: historyMore,
+                  onMore: () => void loadRemoteHistory(remoteHistory?.next),
+                  onDownload: (entry) => void downloadAndShare(entry),
+                  onDelete: deleteRemote,
+                } : undefined}
               />
             )}
           </View>

@@ -4,9 +4,16 @@
  * produits dans les documents de l'app — pas dans le cache, que le système
  * vide quand il manque de place — pour pouvoir les réenregistrer ou les
  * repartager depuis l'historique.
+ *
+ * Connecté, l'historique affiché est celui du compte (`cloud.merges()`) :
+ * ses entrées portent un `remoteId`, et leur fichier se télécharge à la
+ * demande dans le cache (`remoteCopy`). L'historique local continue d'être
+ * tenu à côté, et reprend la main à la déconnexion.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Directory, File, Paths } from 'expo-file-system';
+
+import type { MergeDto } from './cloud/types';
 
 const KEY = 'confluent.history.v1';
 const LIMIT = 30;
@@ -29,6 +36,32 @@ export interface HistoryEntry {
   notes: number;
   /** Taille du fichier produit, en octets. */
   size: number;
+  /** Identifiant de la fusion dans le compte, pour une entrée venue du serveur. */
+  remoteId?: string;
+}
+
+/** Une fusion du compte, sous la forme d'une entrée d'historique. */
+export function fromMergeDto(merge: MergeDto): HistoryEntry {
+  return {
+    id: `compte-${merge.id}`,
+    remoteId: merge.id,
+    name: merge.fileName,
+    createdAt: merge.createdAt,
+    sources: merge.sources,
+    notes: merge.report.totals.notes,
+    size: merge.size,
+  };
+}
+
+/**
+ * Où télécharger le fichier d'une fusion du compte : le cache, que le
+ * système peut vider. Le fichier reste dans le compte et se retélécharge.
+ * Un sous-dossier par fusion garde le nom attendu pour le partage.
+ */
+export function remoteCopy(entry: HistoryEntry): File {
+  const dir = new Directory(Paths.cache, 'fusions', entry.remoteId ?? entry.id);
+  dir.create({ intermediates: true, idempotent: true });
+  return new File(dir, entry.name);
 }
 
 export async function loadHistory(): Promise<HistoryEntry[]> {
