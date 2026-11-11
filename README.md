@@ -77,6 +77,15 @@ préréglage Next.js, sans dossier de sortie forcé.
 | `web/lib/sqlite-wasm.ts` | `SqliteHost` + SHA-256 pour le navigateur |
 | `web/lib/history.ts` | Historique des fusions, en `localStorage` ; fichiers produits en IndexedDB |
 | `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
+| `web/prisma/schema.prisma` | Comptes (Better Auth), sauvegardes déposées et fusions : métadonnées seulement, les fichiers vivent dans R2 |
+| `web/lib/db.ts` | Client Prisma du serveur, sur l'adaptateur Neon (URL poolée) |
+
+La base est un Postgres Neon : branche `dev` en local, `main` en production.
+Le client Prisma est généré au `bun install` (`web/generated/`, non commité).
+Pour faire évoluer le schéma, depuis `web/` avec `.env.local` rempli :
+
+    bunx prisma migrate dev --name <changement>   # sur la branche dev
+    bunx prisma migrate deploy                    # sur main, au déploiement
 
 Deux particularités de l'hôte navigateur :
 
