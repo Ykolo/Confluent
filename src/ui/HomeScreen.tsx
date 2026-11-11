@@ -7,7 +7,7 @@ import type { ConflictStrategy } from '../merge';
 import * as fmt from '../format';
 import { color, font, radius, space } from '../theme';
 import {
-  Card, DashedButton, ErrorNotice, Eyebrow, PlusRule, PrimaryButton, ProgressBar, Segmented,
+  Card, DashedButton, ErrorNotice, Eyebrow, PlusRule, PrimaryButton, ProgressBar, Segmented, TextLink,
 } from './kit';
 
 const STRATEGIES = [
@@ -15,12 +15,41 @@ const STRATEGIES = [
   { value: 'newest', label: 'Version récente' },
 ] as const satisfies readonly { value: ConflictStrategy; label: string }[];
 
-function FileSlot({ label, info, onPress, disabled, step }: {
+/** Ce que le compte sait d'un emplacement, affiché sous sa carte. */
+export interface CloudLine {
+  /** « Déposé depuis iPhone · il y a 2 h », « Envoi vers le compte… ». */
+  text: string;
+  /** Présent quand l'emplacement est occupé dans le compte : le vider. */
+  onRemove?: () => void;
+}
+
+function FileSlot({ label, info, onPress, disabled, step, cloud }: {
   label: string;
   info: BackupInfo | null;
   onPress: () => void;
   disabled?: boolean;
   /** Phase de lecture en cours, tant que les compteurs manquent. */
+  step?: string | null;
+  cloud?: CloudLine | null;
+}) {
+  const slot = <FileSlotCard label={label} info={info} onPress={onPress} disabled={disabled} step={step} />;
+  if (!info || !cloud) return slot;
+  return (
+    <View>
+      {slot}
+      <View style={styles.cloudRow}>
+        <Text style={styles.cloudText}>{cloud.text}</Text>
+        {cloud.onRemove && <TextLink small label="Retirer du compte" onPress={cloud.onRemove} disabled={disabled} />}
+      </View>
+    </View>
+  );
+}
+
+function FileSlotCard({ label, info, onPress, disabled, step }: {
+  label: string;
+  info: BackupInfo | null;
+  onPress: () => void;
+  disabled?: boolean;
   step?: string | null;
 }) {
   if (!info) {
@@ -93,11 +122,17 @@ export interface HomeScreenProps {
   onReplace: () => void;
   onStrategyChange: (value: ConflictStrategy) => void;
   onMerge: () => void;
+  /** Synchronisation, quand un compte est connecté ; absente sinon, et l'écran ne change pas. */
+  sync?: {
+    lines: Record<'a' | 'b', CloudLine | null>;
+    keepInAccount: boolean;
+    onKeepChange: (keep: boolean) => void;
+  };
 }
 
 export function HomeScreen({
   fileA, fileB, strategy, busy, reading, progress, error,
-  onDismissError, onPick, onReplace, onStrategyChange, onMerge,
+  onDismissError, onPick, onReplace, onStrategyChange, onMerge, sync,
 }: HomeScreenProps) {
   // Une carte qui n'affiche encore que son manifeste n'a pas de base à
   // fusionner : le bouton reste inerte tant que les deux lectures ne sont pas
@@ -123,6 +158,7 @@ export function HomeScreen({
             onPress={() => onPick('a')}
             disabled={busy}
             step={reading?.slot === 'a' ? reading.step : null}
+            cloud={sync?.lines.a}
           />
           <PlusRule />
           <FileSlot
@@ -131,11 +167,27 @@ export function HomeScreen({
             onPress={() => onPick('b')}
             disabled={busy}
             step={reading?.slot === 'b' ? reading.step : null}
+            cloud={sync?.lines.b}
           />
           {ready && (
             <DashedButton label="Remplacer un fichier" onPress={onReplace} disabled={busy} />
           )}
         </View>
+
+        {sync && (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: sync.keepInAccount, disabled: busy }}
+            disabled={busy}
+            onPress={() => sync.onKeepChange(!sync.keepInAccount)}
+            style={({ pressed }) => [styles.keep, pressed && styles.pressedCard, busy && styles.dim]}
+          >
+            <View style={[styles.box, sync.keepInAccount && styles.boxOn]}>
+              {sync.keepInAccount && <Text style={styles.boxMark}>✓</Text>}
+            </View>
+            <Text style={styles.keepLabel}>Garder aussi dans le compte les fichiers choisis</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -224,4 +276,28 @@ const styles = StyleSheet.create({
 
   progress: { gap: 8 },
   progressLabel: { fontFamily: font.sansMedium, fontSize: 13, color: color.muted },
+
+  cloudRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingTop: 6,
+    paddingHorizontal: 4,
+  },
+  cloudText: { flexShrink: 1, fontFamily: font.sans, fontSize: 12, lineHeight: 17, color: color.faint },
+
+  keep: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 },
+  box: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: color.outline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boxOn: { backgroundColor: color.accent, borderColor: color.accent },
+  boxMark: { fontFamily: font.sansSemi, fontSize: 13, lineHeight: 15, color: color.onAccent },
+  keepLabel: { flexShrink: 1, fontFamily: font.sans, fontSize: 14, color: color.inkSoft },
 });

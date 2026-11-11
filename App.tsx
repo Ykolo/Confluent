@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, Text, View,
+  ActivityIndicator, Alert, AppState, Platform, StatusBar, StyleSheet, Text, View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 // Import par graisse : la racine de ces paquets réexporte toutes les variantes,
@@ -39,15 +39,20 @@ import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
 import { color, font } from './src/theme';
 import { signOut, useSession } from './src/auth-client';
+import type { BackupDto } from './src/cloud/types';
+import { cloud } from './src/platform/cloud-expo';
 import { describeAuthError } from './src/auth-errors';
 import { AccountScreen } from './src/ui/AccountScreen';
 import { HistoryScreen } from './src/ui/HistoryScreen';
-import { HomeScreen } from './src/ui/HomeScreen';
+import { HomeScreen, type CloudLine } from './src/ui/HomeScreen';
 import { Segmented, TextLink } from './src/ui/kit';
 import { SummaryScreen } from './src/ui/SummaryScreen';
 
 type Slot = 'a' | 'b';
 type Tab = 'merge' | 'history';
+
+const SLOTS = ['a', 'b'] as const;
+const NO_REMOTE: Record<Slot, BackupDto | null> = { a: null, b: null };
 
 interface MergeResult {
   report: MergeReport;
@@ -212,62 +217,14 @@ function Confluent() {
         () => new File(asset.uri).bytes());
       lap(`archive de ${bytes.byteLength} octets en mémoire`);
 
-      // Deux compteurs distincts : le travail réellement fait dans les
-      // tranches, et le temps passé à attendre le tour de boucle suivant. Si
-      // le second domine, la lenteur ne vient pas de la décompression mais du
-      // rythme auquel React Native rend la main — et le remède n'est pas le
-      // même.
-      let slices = 0;
-      let breaths = 0;
-      let waiting = 0;
-      let slowest = 0;
-      let mark = Date.now();
-      let lastBreath = Date.now();
+      const pickNo = ++picks.current[slot];
+      setRemote((r) => ({ ...r, [slot]: null }));
+      setUploading((u) => ({ ...u, [slot]: false }));
+      const info = await inspectInto(slot, asset.name, bytes, lap);
 
-      const show = slot === 'a' ? setFileA : setFileB;
-      const info = await inspectBackup(asset.name, bytes, expoHost, {
-        // Le manifeste est lu en quelques millisecondes : la carte s'affiche
-        // aussitôt, appareil et taille compris, et les compteurs la
-        // complètent quand la base a fini d'être décompressée.
-        onOutline: (outline) => {
-          show(outline);
-          lap('manifeste lu, carte affichée');
-          mark = Date.now();
-        },
-        onStep: async (step) => {
-          setReading({ slot, step });
-          logInfo('choix', `→ ${step}`);
-          await breathe();
-          mark = Date.now();
-        },
-        // Sans ce retour à la boucle d'événements entre deux tranches, la
-        // décompression retiendrait le thread JS plusieurs secondes d'affilée
-        // et l'app paraîtrait plantée. Le pourcentage qui monte est la preuve
-        // la plus directe, pour qui regarde l'écran, qu'elle travaille.
-        onSlice: async (done, total) => {
-          const spent = Date.now() - mark;
-          if (spent > slowest) slowest = spent;
-          slices++;
-          if (Date.now() - lastBreath < BREATH_MS) return;
-
-          breaths++;
-          setReading({ slot, step: `décompression ${fmt.percent(done / total)}` });
-          const pause = Date.now();
-          await breathe();
-          waiting += Date.now() - pause;
-          lastBreath = Date.now();
-          mark = Date.now();
-        },
-      });
-
-      logInfo('choix', `décompression : ${slices} tranches, ${breaths} respirations — `
-        + `${waiting} ms d’attente de la boucle, plus longue pause d’affilée ${slowest} ms`);
-      // La sauvegarde décompressée part dans la référence, la fiche affichable
-      // dans l'état — celle-ci ne garde donc que du texte et des nombres.
-      backups.current[slot] = info.backup;
-      show({ ...info, backup: null });
-      lap(`fichier ${slot.toUpperCase()} prêt : ${info.counts?.notes} notes, `
-        + `${info.counts?.highlights} surlignages, ${info.counts?.bookmarks} favoris`);
+      // Connecté, et « garder dans le compte » coché : dépôt en tâche de fond.
+      // L'écran est déjà rendu à l'utilisateur, la fusion n'attend pas l'envoi.
+      if (sync.current.userId && sync.current.keep) void keepRemotely(slot, bytes, info, pickNo);
     } catch (err) {
       setError(surface(`choix du fichier ${slot.toUpperCase()}`, err));
     } finally {
@@ -282,6 +239,180 @@ function Confluent() {
         + `${Date.now() - started} ms depuis l’appui`);
     }
   }, []);
+
+  /**
+   * Décompresse une sauvegarde dans un emplacement, qu'elle vienne du
+   * sélecteur ou du compte. La sauvegarde part dans `backups`, la fiche
+   * affichable dans l'état.
+   */
+  const inspectInto = useCallback(async (
+    slot: Slot, name: string, bytes: Uint8Array, lap: (what: string) => void,
+  ): Promise<BackupInfo> => {
+    // Deux compteurs distincts : le travail réellement fait dans les
+    // tranches, et le temps passé à attendre le tour de boucle suivant. Si
+    // le second domine, la lenteur ne vient pas de la décompression mais du
+    // rythme auquel React Native rend la main — et le remède n'est pas le
+    // même.
+    let slices = 0;
+    let breaths = 0;
+    let waiting = 0;
+    let slowest = 0;
+    let mark = Date.now();
+    let lastBreath = Date.now();
+
+    const show = slot === 'a' ? setFileA : setFileB;
+    const info = await inspectBackup(name, bytes, expoHost, {
+      // Le manifeste est lu en quelques millisecondes : la carte s'affiche
+      // aussitôt, appareil et taille compris, et les compteurs la
+      // complètent quand la base a fini d'être décompressée.
+      onOutline: (outline) => {
+        show(outline);
+        lap('manifeste lu, carte affichée');
+        mark = Date.now();
+      },
+      onStep: async (step) => {
+        setReading({ slot, step });
+        logInfo('choix', `→ ${step}`);
+        await breathe();
+        mark = Date.now();
+      },
+      // Sans ce retour à la boucle d'événements entre deux tranches, la
+      // décompression retiendrait le thread JS plusieurs secondes d'affilée
+      // et l'app paraîtrait plantée. Le pourcentage qui monte est la preuve
+      // la plus directe, pour qui regarde l'écran, qu'elle travaille.
+      onSlice: async (done, total) => {
+        const spent = Date.now() - mark;
+        if (spent > slowest) slowest = spent;
+        slices++;
+        if (Date.now() - lastBreath < BREATH_MS) return;
+
+        breaths++;
+        setReading({ slot, step: `décompression ${fmt.percent(done / total)}` });
+        const pause = Date.now();
+        await breathe();
+        waiting += Date.now() - pause;
+        lastBreath = Date.now();
+        mark = Date.now();
+      },
+    });
+
+    logInfo('choix', `décompression : ${slices} tranches, ${breaths} respirations — `
+      + `${waiting} ms d’attente de la boucle, plus longue pause d’affilée ${slowest} ms`);
+    // La sauvegarde décompressée part dans la référence, la fiche affichable
+    // dans l'état — celle-ci ne garde donc que du texte et des nombres.
+    backups.current[slot] = info.backup;
+    const shown = { ...info, backup: null };
+    show(shown);
+    lap(`fichier ${slot.toUpperCase()} prêt : ${info.counts?.notes} notes, `
+      + `${info.counts?.highlights} surlignages, ${info.counts?.bookmarks} favoris`);
+    return shown;
+  }, []);
+
+  // --- Synchronisation des emplacements, quand un compte est connecté ---
+
+  const session = useSession();
+  const userId = session.data?.user.id ?? null;
+  /** La sauvegarde du compte qui correspond au fichier affiché dans chaque emplacement. */
+  const [remote, setRemote] = useState<Record<Slot, BackupDto | null>>(NO_REMOTE);
+  const [uploading, setUploading] = useState<Record<Slot, boolean>>({ a: false, b: false });
+  const [keepInAccount, setKeepInAccount] = useState(true);
+  /** Numéro du dernier choix par emplacement : un envoi tardif ne rattache pas un fichier remplacé. */
+  const picks = useRef<Record<Slot, number>>({ a: 0, b: 0 });
+  /**
+   * Compte et case à cocher, lus par `pick` sans en dépendre : `pick` reste
+   * stable, et le verrou du sélecteur avec lui.
+   */
+  const sync = useRef({ userId, keep: keepInAccount });
+  sync.current = { userId, keep: keepInAccount };
+
+  /** Dépose en tâche de fond la sauvegarde qu'on vient de lire. */
+  const keepRemotely = useCallback(async (slot: Slot, bytes: Uint8Array, info: BackupInfo, pickNo: number) => {
+    setUploading((u) => ({ ...u, [slot]: true }));
+    try {
+      const sha256 = await sha256Expo(bytes);
+      const dto = await timed('synchronisation', `dépôt de ${info.name} en ${slot.toUpperCase()}`,
+        () => cloud.uploadBackup(slot, info, bytes, sha256));
+      if (picks.current[slot] === pickNo) setRemote((r) => ({ ...r, [slot]: dto }));
+    } catch (err) {
+      setError(surface(`dépôt dans le compte, emplacement ${slot.toUpperCase()}`, err));
+    } finally {
+      if (picks.current[slot] === pickNo) setUploading((u) => ({ ...u, [slot]: false }));
+    }
+  }, []);
+
+  /**
+   * Reprend les emplacements du compte : au lancement, à la connexion, et au
+   * retour au premier plan (un autre appareil a pu déposer entre-temps). Un
+   * emplacement déjà rempli sur le téléphone est laissé tel quel.
+   */
+  const syncing = useRef(false);
+  const pullSlots = useCallback(async () => {
+    if (!sync.current.userId || syncing.current || picking.current) return;
+    syncing.current = true;
+    try {
+      const slots = await cloud.slots();
+      for (const slot of SLOTS) {
+        const dto = slots[slot];
+        // L'emplacement du compte a changé ailleurs : la ligne ne correspond plus.
+        setRemote((r) => (r[slot] && r[slot]!.id !== dto?.id ? { ...r, [slot]: null } : r));
+        if (!dto || backups.current[slot]) continue;
+
+        const pickNo = ++picks.current[slot];
+        const lap = stopwatch('synchronisation', `emplacement ${slot.toUpperCase()}`);
+        setRemote((r) => ({ ...r, [slot]: dto }));
+        setBusy(true);
+        setReading({ slot, step: 'téléchargement depuis le compte' });
+        (slot === 'a' ? setFileA : setFileB)({
+          name: dto.name, size: dto.size, deviceName: dto.deviceName,
+          createdAt: dto.backupCreatedAt, counts: null, backup: null,
+        });
+        try {
+          const bytes = await cloud.downloadBackup(dto);
+          lap(`téléchargé : ${bytes.byteLength} octets`);
+          await inspectInto(slot, dto.name, bytes, lap);
+        } catch (err) {
+          (slot === 'a' ? setFileA : setFileB)(null);
+          if (picks.current[slot] === pickNo) setRemote((r) => ({ ...r, [slot]: null }));
+          setError(surface(`récupération depuis le compte, emplacement ${slot.toUpperCase()}`, err));
+        } finally {
+          setReading(null);
+          setBusy(false);
+        }
+      }
+    } catch (err) {
+      setError(surface('synchronisation des emplacements', err));
+    } finally {
+      syncing.current = false;
+    }
+  }, [inspectInto]);
+
+  useEffect(() => {
+    setRemote(NO_REMOTE);
+    if (!userId) return;
+    void pullSlots();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void pullSlots();
+    });
+    return () => sub.remove();
+  }, [userId, pullSlots]);
+
+  const removeRemote = useCallback(async (slot: Slot) => {
+    setError(null);
+    try {
+      await cloud.clearSlot(slot);
+      setRemote((r) => ({ ...r, [slot]: null }));
+    } catch (err) {
+      setError(surface(`retrait du compte, emplacement ${slot.toUpperCase()}`, err));
+    }
+  }, []);
+
+  const cloudLine = (slot: Slot): CloudLine | null => {
+    if (uploading[slot]) return { text: 'Envoi vers le compte…' };
+    const dto = remote[slot];
+    if (!dto) return null;
+    const from = dto.uploadedFrom ? `Déposé depuis ${dto.uploadedFrom}` : 'Dans le compte';
+    return { text: `${from} · ${fmt.timeAgo(dto.createdAt)}`, onRemove: () => void removeRemote(slot) };
+  };
 
   const replace = useCallback(() => {
     Alert.alert('Remplacer un fichier', 'Quel fichier voulez-vous remplacer ?', [
@@ -451,7 +582,6 @@ function Confluent() {
   }, []);
 
   // Le compte, facultatif : une ligne discrète au-dessus de l'écran.
-  const session = useSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const logout = useCallback(async () => {
     setError(null);
@@ -527,6 +657,11 @@ function Confluent() {
                 onReplace={replace}
                 onStrategyChange={setStrategy}
                 onMerge={() => void merge()}
+                sync={userId ? {
+                  lines: { a: cloudLine('a'), b: cloudLine('b') },
+                  keepInAccount,
+                  onKeepChange: setKeepInAccount,
+                } : undefined}
               />
             ) : (
               <HistoryScreen
