@@ -475,3 +475,54 @@
   margin: 0;
   accent-color: var(--accent);
 }
+
+/* --- Historique du compte et enregistrement de la fusion --- */
+
+.entryActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 14px;
+  margin-left: auto;
+}
+.entryActions .entryAction {
+  margin-left: 0;
+}
+.entryQuiet {
+  font-weight: 500;
+  color: var(--faint);
+}
+.entryDanger {
+  color: var(--danger);
+}
+
+.historyLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--fainter);
+}
+
+.historyMore {
+  margin-top: 16px;
+}
+
+.cloudSave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cloudSaved {
+  font-weight: 500;
+  color: var(--accent);
+}
+.cloudSaveError {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
