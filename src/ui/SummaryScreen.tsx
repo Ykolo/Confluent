@@ -1,11 +1,37 @@
 /** Écran 2 — Récapitulatif : ce que contient le fichier produit, et quoi en faire. */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { ErrorView } from '../errors';
 import * as fmt from '../format';
 import type { MergeReport } from '../merge';
 import { color, font, radius, space } from '../theme';
 import { Card, ErrorNotice, Eyebrow, PrimaryButton, SecondaryButton } from './kit';
+
+/** Où en est l'enregistrement de la fusion dans le compte. */
+export type CloudSave =
+  | { state: 'saving' }
+  | { state: 'saved' }
+  | { state: 'error'; error: ErrorView; onRetry: () => void };
+
+function CloudSaveLine({ save }: { save: CloudSave }) {
+  if (save.state === 'saving') {
+    return (
+      <View style={styles.cloudSave}>
+        <ActivityIndicator size="small" color={color.accent} />
+        <Text style={styles.cloudSaveText}>Enregistrement dans ton compte…</Text>
+      </View>
+    );
+  }
+  if (save.state === 'saved') {
+    return <Text style={[styles.cloudSaveText, styles.cloudSaved]}>✓ Enregistré dans ton compte</Text>;
+  }
+  return (
+    <View style={styles.cloudSaveError}>
+      <ErrorNotice error={save.error} />
+      <SecondaryButton label="Réessayer l’enregistrement" onPress={save.onRetry} />
+    </View>
+  );
+}
 
 function Row({ label, value, dim, last }: {
   label: string;
@@ -36,11 +62,13 @@ export interface SummaryScreenProps {
   onOpenInJwLibrary: () => void;
   onShare: () => void;
   onClose: () => void;
+  /** Enregistrement dans le compte, quand un compte est connecté. */
+  cloudSave?: CloudSave | null;
 }
 
 export function SummaryScreen({
   report, fileName, fileSize, busy, status, error, onDismissError, onSave, onOpenInJwLibrary,
-  onShare, onClose,
+  onShare, onClose, cloudSave,
 }: SummaryScreenProps) {
   // Les trois premières lignes sont celles de la maquette ; les suivantes
   // n'apparaissent que lorsqu'elles ont quelque chose à dire.
@@ -91,6 +119,7 @@ export function SummaryScreen({
           <Text style={styles.outputMeta}>
             {fmt.size(fileSize)} · prêt à réimporter dans votre bibliothèque
           </Text>
+          {cloudSave && <CloudSaveLine save={cloudSave} />}
         </View>
 
         {/*
@@ -138,6 +167,11 @@ export function SummaryScreen({
 }
 
 const styles = StyleSheet.create({
+  cloudSave: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  cloudSaveText: { fontFamily: font.sans, fontSize: 13, color: color.muted, marginTop: 6 },
+  cloudSaved: { fontFamily: font.sansMedium, color: color.accent },
+  cloudSaveError: { gap: 10, marginTop: 10 },
+
   root: { flex: 1 },
   scroll: { paddingTop: space.screenTop, paddingHorizontal: space.gutter, paddingBottom: 24 },
 
