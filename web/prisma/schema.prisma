@@ -36,15 +36,19 @@ model Backup {
   id              String   @id @default(uuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Emplacement A ou B. Remis à null une fois la sauvegarde consommée par une
-  // fusion : l'unicité (userId, slot) ne porte alors plus dessus.
+  // Emplacement A ou B. Remis à null quand une autre sauvegarde prend la place
+  // ou qu'une fusion la consomme : l'unicité (userId, slot) ne porte alors
+  // plus dessus. Toujours null tant que l'envoi n'est pas confirmé.
   slot            Slot?
   objectKey       String   @unique
-  name            String
+  // Taille et empreinte annoncées à la création du ticket d'envoi.
   size            Int
   sha256          String
-  deviceName      String
-  backupCreatedAt DateTime
+  // Renseignés à la confirmation (`POST /api/backups/:id/confirm`) : null tant
+  // que la ligne est `pending`, toujours présents une fois `ready`.
+  name            String?
+  deviceName      String?
+  backupCreatedAt DateTime?
   counts          Json?
   uploadedFrom    String?
   status          Status   @default(pending)
@@ -58,13 +62,16 @@ model Merge {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  objectKey String   @unique
-  fileName  String
+  objectKey String    @unique
   size      Int
-  sources   String
-  strategy  Strategy
-  report    Json
-  status    Status   @default(pending)
+  sha256    String
+  // Renseignés à la confirmation (`POST /api/merges/:id/confirm`) : null tant
+  // que la ligne est `pending`, toujours présents une fois `ready`.
+  fileName  String?
+  sources   String?
+  strategy  Strategy?
+  report    Json?
+  status    Status    @default(pending)
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
