@@ -5,7 +5,8 @@
  * tranches pour garder l'écran vivant. Ce qui change est ce que le navigateur
  * sait faire : le fichier arrive d'un `<input>` ou d'un glisser-déposer, la
  * base s'ouvre dans SQLite compilé en WebAssembly, et le résultat part en
- * téléchargement. Rien n'est envoyé à un serveur.
+ * téléchargement. La fusion ne quitte jamais le navigateur ; avec un compte,
+ * les fichiers choisis et la fusion produite sont en plus déposés dans R2.
  */
 'use client';
 
