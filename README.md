@@ -1,8 +1,10 @@
 # Confluent — fusion de sauvegardes JW Library
 
-Application Expo qui fusionne deux fichiers `.jwlibrary` en un seul, sans
-perte. Trois écrans : choisir les deux fichiers, lire le récapitulatif de la
-fusion, retrouver les fusions précédentes.
+Application Expo et site web qui fusionnent deux fichiers `.jwlibrary` en un
+seul, sans perte. Trois écrans : choisir les deux fichiers, lire le
+récapitulatif de la fusion, retrouver les fusions précédentes. Un compte,
+facultatif, garde les sauvegardes et les fusions d'un appareil à l'autre (voir
+[Compte et synchronisation](#compte-et-synchronisation)).
 
     bun install
     bun expo start
@@ -45,8 +47,11 @@ nom du fichier produit.
 | `src/backup-info.ts` | Lecture d'une sauvegarde choisie : compteurs des cartes fichier |
 | `src/history.ts` | Historique des fusions, en `AsyncStorage` ; fichiers produits dans les documents de l’app |
 | `src/theme.ts` | Les jetons du canvas de design : couleurs, rayons, fontes |
-| `src/ui/` | Les trois écrans et leurs briques |
+| `src/ui/` | Les trois écrans, la connexion, la suppression du compte, et leurs briques |
 | `src/cloud/` | Client de l'API de synchronisation, partagé par l'app et le site : types échangés (DTO) et `createCloudClient`, sans dépendance de plateforme |
+| `src/auth-client.ts` | Client Better Auth de l'app : session dans le trousseau (`expo-secure-store`), adresse du serveur (`EXPO_PUBLIC_API_URL`) |
+| `src/auth-errors.ts` | Erreurs de compte traduites en français, partagées avec le site |
+| `src/platform/cloud-expo.ts` | Le client de synchronisation de l'app, sur `expo/fetch` |
 
 Le fichier produit sort en `.jwlibrary` : c'est l'extension que JW Library
 accepte à la restauration.
@@ -58,18 +63,33 @@ la racine installe l'app et le site. Mêmes trois écrans, et surtout **le même
 moteur** : le site importe `src/merge.ts`, `backup-info.ts`, `errors.ts`,
 `format.ts`, `progress.ts` et `theme.ts` tels quels, par l'alias `@core/*`.
 
-    cd web
-    bun run dev      # http://localhost:3000
+Le site est un serveur Next sur Vercel, et non plus un export statique : il
+n'y a plus de `web/out/`. Le serveur porte les comptes et la synchronisation
+(`app/api/*`) ; la fusion, elle, se fait toujours dans le navigateur, dans un
+composant client. `GET /api/health` répond `{"status":"ok"}` tant qu'il
+tourne. Sur Vercel : dossier racine `web`, préréglage Next.js, sans dossier de
+sortie forcé.
+
+### Lancer le site en local
+
+Les variables d'environnement sont décrites, sans valeur, dans
+[`web/.env.example`](web/.env.example) : base Neon, secret Better Auth,
+bucket R2 et secret du Cron. Les copier dans `web/.env.local` et les remplir
+(branche Neon `dev`), puis, depuis `web/` :
+
+    bunx prisma migrate dev   # met la branche dev au niveau du schéma
+    bun run dev               # http://localhost:3000
+
+Les autres commandes :
+
     bun run build    # build Next dans web/.next/
     bun run start    # sert ce build, http://localhost:3000
-    bun test         # l'hôte WebAssembly, contre celui de Bun
+    bun test         # hôte WebAssembly, module R2, purge, utilitaires d'API
 
-La fusion se fait toujours dans le navigateur : la page est un composant
-client, et les sauvegardes ne partent nulle part pendant une fusion. Le site
-est pourtant un serveur Next, pas un export statique : c'est lui qui portera
-les comptes et la synchronisation (`app/api/*`). `GET /api/health` répond
-`{"status":"ok"}` tant qu'il tourne. Sur Vercel : dossier racine `web`,
-préréglage Next.js, sans dossier de sortie forcé.
+L'app mobile vise le site de production, ou celui que désigne
+`EXPO_PUBLIC_API_URL` dans le `.env` de la racine (voir
+[`.env.example`](.env.example)) : l'adresse IP du PC sur le réseau local, avec
+le site lancé par `bun run dev -H 0.0.0.0` (l'option va à `next dev`).
 
 | Fichier | Rôle |
 |---|---|
@@ -80,8 +100,14 @@ préréglage Next.js, sans dossier de sortie forcé.
 | `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
 | `web/prisma/schema.prisma` | Comptes (Better Auth), sauvegardes déposées et fusions : métadonnées seulement, les fichiers vivent dans R2 |
 | `web/lib/db.ts` | Client Prisma du serveur, sur l'adaptateur Neon (URL poolée) |
-| `web/lib/auth.ts` | Comptes (Better Auth) : e-mail et mot de passe, plugin Expo pour l'app, `requireUser()` pour les routes |
-| `web/lib/r2.ts` | Fichiers dans Cloudflare R2 : clés, URL présignées d'envoi et de téléchargement, vérification, suppression |
+| `web/lib/auth.ts` | Comptes (Better Auth) : e-mail et mot de passe, plugin Expo pour l'app, suppression du compte, `requireUser()` pour les routes |
+| `web/lib/r2.ts` | Fichiers dans Cloudflare R2 : clés, URL présignées d'envoi et de téléchargement, vérification, copie, suppression |
+| `web/lib/api.ts` | Ce que partagent les routes : erreurs, validation des corps (Zod), passage des lignes aux DTO |
+| `web/lib/limits.ts` | Quota de 30 fusions par compte, limite de 20 envois par heure |
+| `web/lib/cleanup.ts` | Ménage quotidien (Cron Vercel) : envois abandonnés, sauvegardes expirées |
+| `web/lib/purge.ts` | Effacement des fichiers R2 d'un compte supprimé |
+| `web/app/api/` | Les routes : envois, emplacements, fusions, fichiers, comptes, ménage |
+| `web/vercel.json` | Le Cron du ménage, chaque jour à 4 h UTC |
 
 La base est un Postgres Neon : branche `dev` en local, `main` en production.
 Le client Prisma est généré au `bun install` (`web/generated/`, non commité).
@@ -106,6 +132,48 @@ Deux particularités de l'hôte navigateur :
   `SQLITE_CANTOPEN`, avec ou sans journal à côté. En mode exclusif, SQLite
   tient l'index du WAL dans le tas, et le journal d'une sauvegarde Android est
   bien intégré. Le pragma doit précéder toute lecture.
+
+## Compte et synchronisation
+
+Le compte est **facultatif** : sans lui, l'app et le site fusionnent comme
+avant, et rien ne quitte l'appareil. Avec lui, on retrouve sur un appareil ce
+qu'on a déposé depuis un autre : la tablette dépose sa sauvegarde en A, le
+téléphone la sienne en B, et l'un ou l'autre fusionne.
+
+**Ce qui est envoyé.** Les fichiers `.jwlibrary` que l'on choisit de garder
+dans le compte (case « Garder aussi dans le compte »), et les fusions
+produites. Ils vont directement de l'appareil à Cloudflare R2, par une URL
+signée de 10 minutes : ils ne transitent pas par le serveur. La base Postgres
+(Neon) ne garde que des métadonnées : nom du fichier, taille, empreinte
+SHA-256, appareil d'envoi, et les compteurs affichés (notes, surlignages,
+favoris).
+
+**Ce qui ne l'est jamais.** Le serveur n'ouvre pas les sauvegardes : aucune
+lecture, aucune fusion côté serveur. La fusion se fait toujours sur
+l'appareil, dans l'app ou dans le navigateur, avec le même moteur
+(`src/merge.ts`). Le mot de passe est haché par Better Auth.
+
+**Combien de temps.**
+
+| Quoi | Durée |
+|---|---|
+| Sauvegarde déposée (emplacements A et B) | 30 jours, puis effacée par la règle de cycle de vie de R2. Elle quitte son emplacement dès qu'une fusion la consomme ou qu'une autre la remplace |
+| Fusion enregistrée | Les 30 plus récentes par compte. Au-delà, la plus ancienne part, fichier et ligne |
+| Envoi commencé mais jamais confirmé | 1 heure au plus : le ménage quotidien l'efface |
+
+Une sauvegarde déjà présente dans l'emplacement visé (même empreinte) n'est
+pas renvoyée. On peut aussi placer une fusion dans l'emplacement A pour
+préparer la suivante, sans la retélécharger : elle y est copiée côté R2.
+
+**Supprimer son compte.** « Supprimer le compte », dans la barre du compte,
+sur le site et dans l'app, avec le mot de passe pour confirmer. Les fichiers
+du compte sont effacés de R2 **avant** le compte : si R2 ne répond pas, le
+compte est conservé et la suppression peut être retentée, plutôt que de
+laisser des fichiers sans propriétaire. Les fichiers déjà enregistrés sur les
+appareils ne sont pas touchés.
+
+**Limites.** 20 envois par heure et par compte, des tentatives de connexion
+limitées par Better Auth, des fichiers de 200 Mo au plus.
 
 ## API
 
