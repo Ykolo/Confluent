@@ -29,7 +29,7 @@ export const authClient = createAuthClient({
   ],
 });
 
-export const { useSession, signIn, signUp, signOut } = authClient;
+export const { useSession, signIn, signUp, signOut, deleteUser } = authClient;
 
 /** En-têtes de session pour les appels à l'API de synchronisation (`createCloudClient`). */
 export async function cloudHeaders(): Promise<Record<string, string>> {

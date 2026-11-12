@@ -25,6 +25,7 @@ import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type Histo
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';
 
 import { AccountScreen } from './AccountScreen';
+import { DeleteAccountScreen } from './DeleteAccountScreen';
 import { HistoryScreen } from './HistoryScreen';
 import { HomeScreen, type CloudLine } from './HomeScreen';
 import { Segmented } from './kit';
@@ -103,12 +104,13 @@ function canShareFiles(file: File): boolean {
  * Rien ne s'affiche tant que la session n'est pas connue, pour ne pas faire
  * clignoter « Se connecter » chez quelqu'un qui l'est déjà.
  */
-function AccountBar({ email, pending, disabled, onSignIn, onSignOut }: {
+function AccountBar({ email, pending, disabled, onSignIn, onSignOut, onDelete }: {
   email: string | null;
   pending: boolean;
   disabled: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
+  onDelete: () => void;
 }) {
   if (pending) return <div className={s.account} />;
   return (
@@ -118,6 +120,10 @@ function AccountBar({ email, pending, disabled, onSignIn, onSignOut }: {
           <span className={s.accountEmail} title={email}>{email}</span>
           <span aria-hidden>·</span>
           <button type="button" className={s.accountLink} onClick={onSignOut} disabled={disabled}>Se déconnecter</button>
+          <span aria-hidden>·</span>
+          <button type="button" className={`${s.accountLink} ${s.accountQuiet}`} onClick={onDelete} disabled={disabled}>
+            Supprimer le compte
+          </button>
         </>
       ) : (
         <button type="button" className={s.accountLink} onClick={onSignIn} disabled={disabled}>
@@ -154,7 +160,8 @@ export function Confluent() {
   const [stored, setStored] = useState<Set<string>>(new Set());
 
   const session = useSession();
-  const [accountOpen, setAccountOpen] = useState(false);
+  /** Écran du compte ouvert par-dessus l'application, s'il y en a un. */
+  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'delete' | null>(null);
 
   const logout = useCallback(async () => {
     setError(null);
@@ -558,16 +565,23 @@ export function Confluent() {
           onClose={closeSummary}
           cloudSave={userId ? cloudSave : null}
         />
-      ) : accountOpen ? (
-        <AccountScreen onDone={() => setAccountOpen(false)} />
+      ) : accountScreen === 'sign-in' ? (
+        <AccountScreen onDone={() => setAccountScreen(null)} />
+      ) : accountScreen === 'delete' && session.data ? (
+        <DeleteAccountScreen
+          email={session.data.user.email}
+          onCancel={() => setAccountScreen(null)}
+          onDeleted={() => setAccountScreen(null)}
+        />
       ) : (
         <>
           <AccountBar
             email={session.data?.user.email ?? null}
             pending={session.isPending}
             disabled={busy}
-            onSignIn={() => { setError(null); setAccountOpen(true); }}
+            onSignIn={() => { setError(null); setAccountScreen('sign-in'); }}
             onSignOut={() => void logout()}
+            onDelete={() => { setError(null); setAccountScreen('delete'); }}
           />
           <div className={s.content}>
             {tab === 'merge' ? (

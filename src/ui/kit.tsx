@@ -66,6 +66,18 @@ export function SecondaryButton(props: { label: ReactNode; onPress?: () => void;
   );
 }
 
+/** Action irréversible (« Supprimer définitivement »). */
+export function DangerButton(props: { label: ReactNode; onPress?: () => void; disabled?: boolean }) {
+  return (
+    <Button
+      {...props}
+      base={styles.danger}
+      pressed={styles.dangerPressed}
+      labelStyle={styles.dangerLabel}
+    />
+  );
+}
+
 export function DashedButton(props: { label: ReactNode; onPress?: () => void; disabled?: boolean }) {
   return (
     <Button
@@ -78,11 +90,13 @@ export function DashedButton(props: { label: ReactNode; onPress?: () => void; di
 }
 
 /** Lien souligné : « Continuer sans compte », « Se déconnecter ». */
-export function TextLink({ label, onPress, disabled, small }: {
+export function TextLink({ label, onPress, disabled, small, quiet }: {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
   small?: boolean;
+  /** Plus effacé : une action rare, comme « Supprimer le compte ». */
+  quiet?: boolean;
 }) {
   return (
     <Pressable
@@ -93,7 +107,7 @@ export function TextLink({ label, onPress, disabled, small }: {
       hitSlop={8}
       style={({ pressed }) => [disabled && styles.disabled, pressed && styles.linkPressed]}
     >
-      <Text style={[styles.link, small && styles.linkSmall]}>{label}</Text>
+      <Text style={[styles.link, small && styles.linkSmall, quiet && styles.linkQuiet]}>{label}</Text>
     </Pressable>
   );
 }
@@ -295,6 +309,19 @@ const styles = StyleSheet.create({
   },
   secondaryPressed: { borderColor: color.faint },
   secondaryLabel: { fontFamily: font.sansMedium, fontSize: 16, color: color.inkSoft },
+
+  danger: {
+    borderWidth: 1,
+    borderColor: color.dangerBorder,
+    borderRadius: radius.button,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerPressed: { backgroundColor: color.dangerSurface },
+  dangerLabel: { fontFamily: font.sansSemi, fontSize: 16, color: color.danger },
+  linkQuiet: { color: color.faint },
 
   dashed: {
     borderWidth: 1,
