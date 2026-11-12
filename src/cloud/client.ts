@@ -19,9 +19,9 @@ import type {
   ApiError,
   BackupDto,
   DownloadLink,
-  MergeDto,
   MergeMeta,
   MergePage,
+  SavedMerge,
   Slot,
   Slots,
   UploadKind,
@@ -41,8 +41,11 @@ export interface CloudClient {
   uploadBackup(slot: Slot, info: BackupMeta, body: FileBody, sha256: string): Promise<BackupDto>;
   /** Récupère le contenu d'une sauvegarde déposée. */
   downloadBackup(backup: BackupDto): Promise<Uint8Array>;
-  /** Enregistre une fusion dans l'historique et libère les emplacements consommés. */
-  saveMerge(file: FileBody, meta: MergeMeta, sha256: string): Promise<MergeDto>;
+  /**
+   * Enregistre une fusion dans l'historique et libère les emplacements
+   * consommés, sauf ceux où une autre sauvegarde a été déposée entre-temps.
+   */
+  saveMerge(file: FileBody, meta: MergeMeta, sha256: string): Promise<SavedMerge>;
   /** Une page de l'historique ; `next` se repasse tel quel pour la suivante. */
   merges(cursor?: string): Promise<MergePage>;
   /** Lien de téléchargement de 5 minutes, sous le nom du fichier. */
@@ -215,7 +218,7 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
 
     async saveMerge(file, meta, sha256) {
       const id = await upload('merge', file, sha256);
-      return call<MergeDto>('POST', `/api/merges/${encodeURIComponent(id)}/confirm`, meta);
+      return call<SavedMerge>('POST', `/api/merges/${encodeURIComponent(id)}/confirm`, meta);
     },
 
     merges: (cursor) =>

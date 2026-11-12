@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { inspectBackup, type BackupInfo } from '@core/backup-info';
-import type { BackupDto, MergeDto, MergeMeta, MergePage } from '@core/cloud/types';
+import { describeKeptSlot, type BackupDto, type MergeDto, type MergeMeta, type MergePage } from '@core/cloud/types';
 import { isCancellation, logError, logInfo, stopwatch, type ErrorView } from '@core/errors';
 import * as fmt from '@core/format';
 import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
@@ -352,13 +352,15 @@ export function Confluent() {
     try {
       const saved = await cloud.saveMerge(job.file, job.meta, job.sha256);
       if (pendingSave.current !== job) return;
-      setCloudSave({ state: 'saved' });
-      // Le serveur a libéré les emplacements consommés : la page suit.
+      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot) });
+      // Le serveur a libéré les emplacements consommés : la page suit. Un
+      // emplacement redéposé entre-temps ne correspond plus au fichier affiché.
       setRemote((r) => ({
-        a: r.a && job.meta.backupIds.includes(r.a.id) ? null : r.a,
-        b: r.b && job.meta.backupIds.includes(r.b.id) ? null : r.b,
+        a: r.a && job.meta.backups.a === r.a.id ? null : r.a,
+        b: r.b && job.meta.backups.b === r.b.id ? null : r.b,
       }));
-      setRemoteHistory((h) => (h ? { ...h, items: [saved, ...h.items] } : h));
+      const { slotsKept: _kept, ...dto } = saved;
+      setRemoteHistory((h) => (h ? { ...h, items: [dto, ...h.items] } : h));
       logInfo('synchronisation', `${saved.fileName} enregistrée dans le compte`);
     } catch (err) {
       if (pendingSave.current !== job) return;
@@ -465,7 +467,7 @@ export function Confluent() {
             strategy,
             // Les sauvegardes du compte qui ont servi : leurs emplacements
             // seront libérés, s'ils les contiennent encore.
-            backupIds: SLOTS.flatMap((slot) => (remote[slot] ? [remote[slot]!.id] : [])),
+            backups: { a: remote.a?.id, b: remote.b?.id },
           },
         };
         void saveToAccount();

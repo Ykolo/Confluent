@@ -28,7 +28,8 @@ export interface SummaryScreenProps {
 
 export type CloudSave =
   | { state: 'saving' }
-  | { state: 'saved' }
+  /** `notes` : les emplacements laissés en place (voir `describeKeptSlot`). */
+  | { state: 'saved'; notes?: string[] }
   | { state: 'error'; error: ErrorView; onRetry: () => void };
 
 /** Où en est l'enregistrement de la fusion dans le compte. */
@@ -37,7 +38,12 @@ function CloudSaveLine({ save }: { save: CloudSave }) {
     return <p className={s.cloudSave}><Spinner /> Enregistrement dans ton compte…</p>;
   }
   if (save.state === 'saved') {
-    return <p className={`${s.cloudSave} ${s.cloudSaved}`}>✓ Enregistré dans ton compte</p>;
+    return (
+      <>
+        <p className={`${s.cloudSave} ${s.cloudSaved}`}>✓ Enregistré dans ton compte</p>
+        {save.notes?.map((note) => <p key={note} className={s.cloudNote}>{note}</p>)}
+      </>
+    );
   }
   return (
     <div className={s.cloudSaveError}>

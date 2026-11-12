@@ -68,8 +68,34 @@ export interface MergeMeta {
   report: MergeReport;
   sources: string;
   strategy: ConflictStrategy;
-  /** Les sauvegardes déposées qui ont servi : leurs emplacements seront libérés. */
-  backupIds: string[];
+  /**
+   * Les sauvegardes déposées qui ont servi, par emplacement. Le serveur libère
+   * un emplacement seulement s'il contient **encore** celle-là ; si une autre
+   * y a été déposée pendant la fusion, elle reste (voir `SavedMerge`).
+   */
+  backups: Partial<Record<Slot, string>>;
+}
+
+/** Un emplacement laissé en place : une autre sauvegarde y a été déposée pendant la fusion. */
+export interface KeptSlot {
+  slot: Slot;
+  /** La sauvegarde qui occupe maintenant l'emplacement. */
+  backup: BackupDto;
+}
+
+/** Réponse de `POST /api/merges/:id/confirm`. */
+export interface SavedMerge extends MergeDto {
+  /** Vide dans le cas courant, où les emplacements consommés sont libérés. */
+  slotsKept: KeptSlot[];
+}
+
+/**
+ * Ce que l'écran dit d'un emplacement laissé en place :
+ * « Un nouveau fichier A a été déposé entre-temps depuis iPhone. »
+ */
+export function describeKeptSlot({ slot, backup }: KeptSlot): string {
+  const from = backup.uploadedFrom ? ` depuis ${backup.uploadedFrom}` : '';
+  return `Un nouveau fichier ${slot.toUpperCase()} a été déposé entre-temps${from}. Il reste dans le compte pour la prochaine fusion.`;
 }
 
 /** Une page de `GET /api/merges`, du plus récent au plus ancien. */

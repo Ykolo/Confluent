@@ -40,7 +40,7 @@ import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
 import { color, font } from './src/theme';
 import { signOut, useSession } from './src/auth-client';
-import type { BackupDto, MergeMeta, MergePage } from './src/cloud/types';
+import { describeKeptSlot, type BackupDto, type MergeMeta, type MergePage } from './src/cloud/types';
 import { cloud } from './src/platform/cloud-expo';
 import { describeAuthError } from './src/auth-errors';
 import { AccountScreen } from './src/ui/AccountScreen';
@@ -440,13 +440,15 @@ function Confluent() {
       const saved = await timed('synchronisation', `enregistrement de ${job.meta.fileName}`,
         async () => cloud.saveMerge(await job.file.bytes(), job.meta, job.sha256));
       if (pendingSave.current !== job) return;
-      setCloudSave({ state: 'saved' });
-      // Le serveur a libéré les emplacements consommés : l'écran suit.
+      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot) });
+      // Le serveur a libéré les emplacements consommés : l'écran suit. Un
+      // emplacement redéposé entre-temps ne correspond plus au fichier affiché.
       setRemote((r) => ({
-        a: r.a && job.meta.backupIds.includes(r.a.id) ? null : r.a,
-        b: r.b && job.meta.backupIds.includes(r.b.id) ? null : r.b,
+        a: r.a && job.meta.backups.a === r.a.id ? null : r.a,
+        b: r.b && job.meta.backups.b === r.b.id ? null : r.b,
       }));
-      setRemoteHistory((h) => (h ? { ...h, items: [saved, ...h.items] } : h));
+      const { slotsKept: _kept, ...dto } = saved;
+      setRemoteHistory((h) => (h ? { ...h, items: [dto, ...h.items] } : h));
     } catch (err) {
       if (pendingSave.current !== job) return;
       setCloudSave({
@@ -520,7 +522,7 @@ function Confluent() {
             strategy,
             // Les sauvegardes du compte qui ont servi : leurs emplacements
             // seront libérés, s'ils les contiennent encore.
-            backupIds: SLOTS.flatMap((slot) => (remote[slot] ? [remote[slot]!.id] : [])),
+            backups: { a: remote.a?.id, b: remote.b?.id },
           },
         };
         void saveToAccount();
