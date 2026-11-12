@@ -7,7 +7,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { CloudError, createCloudClient } from '../src/cloud/client';
-import type { BackupDto, MergeDto } from '../src/cloud/types';
+import { describeKeptSlot, type BackupDto, type MergeDto } from '../src/cloud/types';
 import { describeError } from '../src/errors';
 
 const API = 'https://confluent.test';
@@ -79,10 +79,18 @@ function fakeServer(opts: { failWith?: (path: string, method: string) => Respons
     m = path.match(/^\/api\/merges\/(\w+)\/confirm$/);
     if (method === 'POST' && m) {
       const p = pending.get(m[1]!)!;
-      for (const b of backups) if (body.backupIds.includes(b.id)) b.slot = null;
-      const dto: MergeDto = { id: m[1]!, size: p.size, sha256: 'x', createdAt: 'now', ...body };
+      const slotsKept: { slot: 'a' | 'b'; backup: BackupDto }[] = [];
+      for (const slot of ['a', 'b'] as const) {
+        const used = body.backups?.[slot];
+        if (!used) continue;
+        const current = backups.find((b) => b.slot === slot);
+        if (current && current.id === used) current.slot = null;
+        else if (current) slotsKept.push({ slot, backup: current });
+      }
+      const { backups: _used, ...meta } = body;
+      const dto: MergeDto = { id: m[1]!, size: p.size, sha256: 'x', createdAt: 'now', ...meta };
       merges.unshift(dto);
-      return json(dto);
+      return json({ ...dto, slotsKept });
     }
     if (method === 'GET' && path === '/api/slots') {
       return json({ a: backups.find((b) => b.slot === 'a') ?? null, b: backups.find((b) => b.slot === 'b') ?? null });
@@ -189,16 +197,29 @@ describe('fusions', () => {
     const a = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
     const b = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
     const merge = await client.saveMerge(bytes('fusion'), {
-      fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backupIds: [a.id, b.id],
+      fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backups: { a: a.id, b: b.id },
     }, 'e'.repeat(64));
     expect(merge).toMatchObject({ fileName: 'Fusion.jwlibrary', strategy: 'keep-both', size: 6 });
     expect(await client.slots()).toEqual({ a: null, b: null });
   });
 
+  test('saveMerge laisse un emplacement redéposé pendant la fusion, et le dit', async () => {
+    const { client } = setup();
+    const a = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
+    const b = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
+    // Pendant la fusion, un autre appareil redépose un A.
+    const newer = await client.uploadBackup('a', { ...info, name: 'nouveau A' }, bytes('a2'), 'f'.repeat(64));
+    const merge = await client.saveMerge(bytes('fusion'), {
+      fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backups: { a: a.id, b: b.id },
+    }, 'e'.repeat(64));
+    expect(merge.slotsKept.map((k) => [k.slot, k.backup.id])).toEqual([['a', newer.id]]);
+    expect(await client.slots()).toEqual({ a: newer, b: null });
+  });
+
   test('merges suit le curseur jusqu’à la dernière page', async () => {
     const { client } = setup();
     for (let i = 0; i < 5; i++) {
-      await client.saveMerge(bytes(`f${i}`), { fileName: `F${i}`, report, sources: '', strategy: 'newest', backupIds: [] }, 'e'.repeat(64));
+      await client.saveMerge(bytes(`f${i}`), { fileName: `F${i}`, report, sources: '', strategy: 'newest', backups: {} }, 'e'.repeat(64));
     }
     const names: string[] = [];
     let cursor: string | undefined;
@@ -212,7 +233,7 @@ describe('fusions', () => {
 
   test('downloadUrl et deleteMerge', async () => {
     const { client } = setup();
-    const m = await client.saveMerge(bytes('x'), { fileName: 'F', report, sources: '', strategy: 'newest', backupIds: [] }, 'e'.repeat(64));
+    const m = await client.saveMerge(bytes('x'), { fileName: 'F', report, sources: '', strategy: 'newest', backups: {} }, 'e'.repeat(64));
     expect(await client.downloadUrl('merge', m.id)).toBe(`${R2}/merges/${m.id}`);
     await client.deleteMerge(m.id);
     expect((await client.merges()).items).toEqual([]);
@@ -278,5 +299,17 @@ describe('erreurs', () => {
     expect(await client.slots().catch((e: CloudError) => e.status)).toBe(401);
     cookie = SESSION;
     expect(await client.slots()).toEqual({ a: null, b: null });
+  });
+});
+
+describe('describeKeptSlot', () => {
+  test('nomme l’emplacement et l’appareil', () => {
+    const backup = { uploadedFrom: 'iPhone' } as BackupDto;
+    expect(describeKeptSlot({ slot: 'a', backup })).toBe(
+      'Un nouveau fichier A a été déposé entre-temps depuis iPhone. Il reste dans le compte pour la prochaine fusion.',
+    );
+    expect(describeKeptSlot({ slot: 'b', backup: { uploadedFrom: null } as BackupDto })).toStartWith(
+      'Un nouveau fichier B a été déposé entre-temps. ',
+    );
   });
 });

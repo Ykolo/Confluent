@@ -10,7 +10,8 @@ import { Card, ErrorNotice, Eyebrow, PrimaryButton, SecondaryButton } from './ki
 /** Où en est l'enregistrement de la fusion dans le compte. */
 export type CloudSave =
   | { state: 'saving' }
-  | { state: 'saved' }
+  /** `notes` : les emplacements laissés en place (voir `describeKeptSlot`). */
+  | { state: 'saved'; notes?: string[] }
   | { state: 'error'; error: ErrorView; onRetry: () => void };
 
 function CloudSaveLine({ save }: { save: CloudSave }) {
@@ -23,7 +24,12 @@ function CloudSaveLine({ save }: { save: CloudSave }) {
     );
   }
   if (save.state === 'saved') {
-    return <Text style={[styles.cloudSaveText, styles.cloudSaved]}>✓ Enregistré dans ton compte</Text>;
+    return (
+      <View style={styles.cloudSavedBlock}>
+        <Text style={[styles.cloudSaveText, styles.cloudSaved]}>✓ Enregistré dans ton compte</Text>
+        {save.notes?.map((note) => <Text key={note} style={styles.cloudNote}>{note}</Text>)}
+      </View>
+    );
   }
   return (
     <View style={styles.cloudSaveError}>
@@ -171,6 +177,8 @@ const styles = StyleSheet.create({
   cloudSaveText: { fontFamily: font.sans, fontSize: 13, color: color.muted, marginTop: 6 },
   cloudSaved: { fontFamily: font.sansMedium, color: color.accent },
   cloudSaveError: { gap: 10, marginTop: 10 },
+  cloudSavedBlock: { gap: 4 },
+  cloudNote: { fontFamily: font.sans, fontSize: 13, lineHeight: 18, color: color.muted },
 
   root: { flex: 1 },
   scroll: { paddingTop: space.screenTop, paddingHorizontal: space.gutter, paddingBottom: 24 },
