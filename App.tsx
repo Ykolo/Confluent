@@ -327,13 +327,17 @@ function Confluent() {
   const sync = useRef({ userId, keep: keepInAccount });
   sync.current = { userId, keep: keepInAccount };
 
+  /** Sauvegardes qu'un dépôt a trouvées déjà dans le compte, pour le dire sous la carte. */
+  const alreadyThere = useRef(new Set<string>());
+
   /** Dépose en tâche de fond la sauvegarde qu'on vient de lire. */
   const keepRemotely = useCallback(async (slot: Slot, bytes: Uint8Array, info: BackupInfo, pickNo: number) => {
     setUploading((u) => ({ ...u, [slot]: true }));
     try {
       const sha256 = await sha256Expo(bytes);
-      const dto = await timed('synchronisation', `dépôt de ${info.name} en ${slot.toUpperCase()}`,
+      const { backup: dto, alreadyThere: known } = await timed('synchronisation', `dépôt de ${info.name} en ${slot.toUpperCase()}`,
         () => cloud.uploadBackup(slot, info, bytes, sha256));
+      if (known) alreadyThere.current.add(dto.id);
       if (picks.current[slot] === pickNo) setRemote((r) => ({ ...r, [slot]: dto }));
     } catch (err) {
       setError(surface(`dépôt dans le compte, emplacement ${slot.toUpperCase()}`, err));
@@ -413,7 +417,10 @@ function Confluent() {
     const dto = remote[slot];
     if (!dto) return null;
     const from = dto.uploadedFrom ? `Déposé depuis ${dto.uploadedFrom}` : 'Dans le compte';
-    return { text: `${from} · ${fmt.timeAgo(dto.createdAt)}`, onRemove: () => void removeRemote(slot) };
+    const text = `${from} · ${fmt.timeAgo(dto.createdAt)}`;
+    // Le fichier choisi était déjà là : rien n'a été renvoyé (YKO-51).
+    const known = alreadyThere.current.has(dto.id) ? `Déjà dans ton compte · ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text;
+    return { text: known, onRemove: () => void removeRemote(slot) };
   };
 
   const replace = useCallback(() => {

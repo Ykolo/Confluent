@@ -287,12 +287,16 @@ export function Confluent() {
     return () => { cancelled = true; };
   }, [userId, read]);
 
+  /** Sauvegardes qu'un dépôt a trouvées déjà dans le compte, pour le dire sous la carte. */
+  const alreadyThere = useRef(new Set<string>());
+
   /** Dépose en tâche de fond le fichier qu'on vient de lire. */
   const keepRemotely = useCallback(async (slot: Slot, picked: File, info: BackupInfo, pick: number) => {
     setUploading((u) => ({ ...u, [slot]: true }));
     try {
       const sha256 = await sha256Web(new Uint8Array(await picked.arrayBuffer()));
-      const dto = await cloud.uploadBackup(slot, info, picked, sha256);
+      const { backup: dto, alreadyThere: known } = await cloud.uploadBackup(slot, info, picked, sha256);
+      if (known) alreadyThere.current.add(dto.id);
       if (picks.current[slot] === pick) setRemote((r) => ({ ...r, [slot]: dto }));
       logInfo('synchronisation', `${info.name} déposé en ${slot.toUpperCase()}`);
     } catch (err) {
@@ -333,7 +337,10 @@ export function Confluent() {
     const dto = remote[slot];
     if (!dto) return null;
     const from = dto.uploadedFrom ? `Déposé depuis ${dto.uploadedFrom}` : 'Dans le compte';
-    return { text: `${from} · ${fmt.timeAgo(dto.createdAt)}`, onRemove: () => void removeRemote(slot) };
+    const text = `${from} · ${fmt.timeAgo(dto.createdAt)}`;
+    // Le fichier choisi était déjà là : rien n'a été renvoyé (YKO-51).
+    const known = alreadyThere.current.has(dto.id) ? `Déjà dans ton compte · ${text.charAt(0).toLowerCase()}${text.slice(1)}` : text;
+    return { text: known, onRemove: () => void removeRemote(slot) };
   };
 
   // --- Enregistrement des fusions et historique du compte ---

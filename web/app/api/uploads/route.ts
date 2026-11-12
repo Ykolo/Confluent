@@ -1,19 +1,24 @@
 /**
- * `POST /api/uploads` `{ kind, size, sha256 }` → `201 { id, putUrl }`
+ * `POST /api/uploads` `{ kind, size, sha256, slot? }` → `201 { id, putUrl }`,
+ * ou `200 { existing }`
  *
  * Première étape d'un envoi : réserve une ligne `pending` et signe l'URL où le
  * client dépose le fichier, directement chez R2. Le serveur choisit la clé ;
  * le client confirme ensuite (`/api/backups/:id/confirm`, ou
  * `/api/merges/:id/confirm` pour une fusion), ce qui vérifie l'objet.
  *
+ * Une sauvegarde destinée à un emplacement qui contient déjà le même fichier
+ * (même empreinte, même taille) n'est pas renvoyée : la réponse est
+ * `{ existing: BackupDto }`, sans URL, et rien n'est compté.
+ *
  * Au plus `UPLOADS_PER_WINDOW` envois par heure et par utilisateur : `429`
  * avec `Retry-After` au-delà.
  */
 import { z } from 'zod';
 
-import { MAX_UPLOAD_BYTES, type UploadTicket } from '@core/cloud/types';
+import { MAX_UPLOAD_BYTES, type ExistingUpload, type UploadTicket } from '@core/cloud/types';
 
-import { apiError, readBody, sha256Schema } from '@/lib/api';
+import { apiError, readBody, sha256Schema, slotSchema, toBackupDto } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { takeUploadToken, UPLOADS_PER_WINDOW } from '@/lib/limits';
@@ -23,6 +28,8 @@ const body = z.object({
   kind: z.enum(['backup', 'merge']),
   size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
   sha256: sha256Schema,
+  // L'emplacement visé par une sauvegarde, pour reconnaître un fichier déjà déposé.
+  slot: slotSchema.optional(),
 });
 
 export async function POST(req: Request) {
@@ -30,6 +37,13 @@ export async function POST(req: Request) {
   if (user instanceof Response) return user;
   const input = await readBody(req, body);
   if (input instanceof Response) return input;
+
+  if (input.kind === 'backup' && input.slot) {
+    const same = await prisma.backup.findFirst({
+      where: { userId: user.id, slot: input.slot, status: 'ready', sha256: input.sha256, size: input.size },
+    });
+    if (same) return Response.json({ existing: toBackupDto(same) } satisfies ExistingUpload);
+  }
 
   const allowance = await takeUploadToken(user.id);
   if (!allowance.allowed) {

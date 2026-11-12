@@ -19,6 +19,7 @@ import type {
   ApiError,
   BackupDto,
   DownloadLink,
+  ExistingUpload,
   MergeMeta,
   MergePage,
   SavedMerge,
@@ -26,6 +27,7 @@ import type {
   Slots,
   UploadKind,
   UploadTicket,
+  UploadedBackup,
 } from './types';
 
 /** Ce que le client retient d'une sauvegarde lue (`inspectBackup`) pour la déposer. */
@@ -37,8 +39,12 @@ export type FileBody = Blob | Uint8Array;
 export interface CloudClient {
   /** Les deux emplacements de l'utilisateur. */
   slots(): Promise<Slots>;
-  /** Dépose une sauvegarde dans un emplacement : ticket, envoi vers R2, confirmation. */
-  uploadBackup(slot: Slot, info: BackupMeta, body: FileBody, sha256: string): Promise<BackupDto>;
+  /**
+   * Dépose une sauvegarde dans un emplacement : ticket, envoi vers R2,
+   * confirmation. Si l'emplacement contient déjà ce fichier, rien n'est
+   * envoyé (`alreadyThere`).
+   */
+  uploadBackup(slot: Slot, info: BackupMeta, body: FileBody, sha256: string): Promise<UploadedBackup>;
   /** Récupère le contenu d'une sauvegarde déposée. */
   downloadBackup(backup: BackupDto): Promise<Uint8Array>;
   /**
@@ -191,8 +197,12 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
     slots: () => call<Slots>('GET', '/api/slots'),
 
     async uploadBackup(slot, info, body, sha256) {
-      const id = await upload('backup', body, sha256);
-      return call<BackupDto>('POST', `/api/backups/${encodeURIComponent(id)}/confirm`, {
+      const answer = await call<UploadTicket | ExistingUpload>('POST', '/api/uploads', {
+        kind: 'backup', size: sizeOf(body), sha256, slot,
+      });
+      if ('existing' in answer) return { backup: answer.existing, alreadyThere: true };
+      await storage('PUT', answer.putUrl, body);
+      const backup = await call<BackupDto>('POST', `/api/backups/${encodeURIComponent(answer.id)}/confirm`, {
         slot,
         name: info.name,
         deviceName: info.deviceName,
@@ -200,6 +210,7 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
         counts: info.counts,
         uploadedFrom: opts.uploadedFrom ?? null,
       });
+      return { backup, alreadyThere: false };
     },
 
     async downloadBackup(backup) {

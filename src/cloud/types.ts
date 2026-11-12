@@ -24,6 +24,21 @@ export interface UploadTicket {
   putUrl: string;
 }
 
+/**
+ * Réponse de `POST /api/uploads` quand l'emplacement visé contient déjà ce
+ * fichier (même empreinte, même taille) : rien à envoyer.
+ */
+export interface ExistingUpload {
+  existing: BackupDto;
+}
+
+/** Résultat d'un dépôt : la sauvegarde de l'emplacement, et si elle y était déjà. */
+export interface UploadedBackup {
+  backup: BackupDto;
+  /** Vrai quand le fichier était déjà dans le compte : il n'a pas été renvoyé. */
+  alreadyThere: boolean;
+}
+
 /** Une sauvegarde déposée et confirmée. */
 export interface BackupDto {
   id: string;

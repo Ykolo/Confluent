@@ -25,7 +25,7 @@ interface Seen {
 function fakeServer(opts: { failWith?: (path: string, method: string) => Response | undefined } = {}) {
   const seen: Seen[] = [];
   const objects = new Map<string, Uint8Array>();
-  const pending = new Map<string, { kind: string; size: number }>();
+  const pending = new Map<string, { kind: string; size: number; sha256: string }>();
   const backups: BackupDto[] = [];
   const merges: MergeDto[] = [];
   let serial = 0;
@@ -59,8 +59,10 @@ function fakeServer(opts: { failWith?: (path: string, method: string) => Respons
     const body = init.body ? JSON.parse(String(init.body)) : undefined;
 
     if (method === 'POST' && path === '/api/uploads') {
+      const same = body.slot && backups.find((b) => b.slot === body.slot && b.sha256 === body.sha256 && b.size === body.size);
+      if (same) return json({ existing: same });
       const id = `id${++serial}`;
-      pending.set(id, { kind: body.kind, size: body.size });
+      pending.set(id, { kind: body.kind, size: body.size, sha256: body.sha256 });
       return json({ id, putUrl: `${R2}/${body.kind}s/${id}` }, 201);
     }
     let m = path.match(/^\/api\/backups\/(\w+)\/confirm$/);
@@ -70,7 +72,7 @@ function fakeServer(opts: { failWith?: (path: string, method: string) => Respons
       if (!objects.has(`/backups/${m[1]}`)) return json({ error: 'upload_missing', message: 'Le fichier n’est pas arrivé : recommence l’envoi.' }, 422);
       for (const b of backups) if (b.slot === body.slot) b.slot = null;
       const dto: BackupDto = {
-        id: m[1]!, slot: body.slot, name: body.name, size: p.size, sha256: 'x', deviceName: body.deviceName,
+        id: m[1]!, slot: body.slot, name: body.name, size: p.size, sha256: p.sha256, deviceName: body.deviceName,
         backupCreatedAt: body.backupCreatedAt, counts: body.counts, uploadedFrom: body.uploadedFrom, createdAt: 'now',
       };
       backups.push(dto);
@@ -145,7 +147,7 @@ describe('parcours de dépôt', () => {
   test('ticket, envoi vers R2, confirmation, puis lecture des emplacements', async () => {
     const { server, client } = setup();
     const file = bytes('sauvegarde A');
-    const dto = await client.uploadBackup('a', info, file, 'f'.repeat(64));
+    const { backup: dto } = await client.uploadBackup('a', info, file, 'f'.repeat(64));
 
     expect(dto).toMatchObject({ slot: 'a', name: 'ipad.jwlibrary', size: file.byteLength, uploadedFrom: 'Essai' });
     expect(server.seen.map((s) => `${s.method} ${s.url.replace(/^https:\/\/[^/]+/, '')}`)).toEqual([
@@ -156,6 +158,20 @@ describe('parcours de dépôt', () => {
     const slots = await client.slots();
     expect(slots.a?.id).toBe(dto.id);
     expect(slots.b).toBeNull();
+  });
+
+  test('un fichier déjà dans l’emplacement n’est pas renvoyé', async () => {
+    const { server, client } = setup();
+    const file = bytes('sauvegarde A');
+    const sha = 'a'.repeat(64);
+    const first = await client.uploadBackup('a', info, file, sha);
+    expect(first.alreadyThere).toBe(false);
+    server.seen.length = 0;
+    const again = await client.uploadBackup('a', info, file, sha);
+    expect(again).toEqual({ backup: first.backup, alreadyThere: true });
+    expect(server.seen.map((s) => `${s.method} ${s.url.replace(/^https:\/\/[^/]+/, '')}`)).toEqual(['POST /api/uploads']);
+    // Même fichier, autre emplacement : il est déposé.
+    expect((await client.uploadBackup('b', info, file, sha)).alreadyThere).toBe(false);
   });
 
   test('R2 ne reçoit ni cookie ni identifiants ; l’API reçoit la session', async () => {
@@ -170,13 +186,13 @@ describe('parcours de dépôt', () => {
   test('downloadBackup rend les octets déposés', async () => {
     const { client } = setup();
     const file = bytes('sauvegarde à relire');
-    const dto = await client.uploadBackup('b', info, file, 'f'.repeat(64));
+    const { backup: dto } = await client.uploadBackup('b', info, file, 'f'.repeat(64));
     expect(await client.downloadBackup(dto)).toEqual(file);
   });
 
   test('downloadBackup refuse un fichier tronqué', async () => {
     const { server, client } = setup();
-    const dto = await client.uploadBackup('a', info, bytes('complet'), 'f'.repeat(64));
+    const { backup: dto } = await client.uploadBackup('a', info, bytes('complet'), 'f'.repeat(64));
     server.objects.set(`/backups/${dto.id}`, bytes('tro'));
     const err = await client.downloadBackup(dto).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CloudError);
@@ -194,8 +210,8 @@ describe('parcours de dépôt', () => {
 describe('fusions', () => {
   test('saveMerge libère les emplacements consommés', async () => {
     const { client } = setup();
-    const a = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
-    const b = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
+    const { backup: a } = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
+    const { backup: b } = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
     const merge = await client.saveMerge(bytes('fusion'), {
       fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backups: { a: a.id, b: b.id },
     }, 'e'.repeat(64));
@@ -205,10 +221,10 @@ describe('fusions', () => {
 
   test('saveMerge laisse un emplacement redéposé pendant la fusion, et le dit', async () => {
     const { client } = setup();
-    const a = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
-    const b = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
+    const { backup: a } = await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64));
+    const { backup: b } = await client.uploadBackup('b', info, bytes('b'), 'f'.repeat(64));
     // Pendant la fusion, un autre appareil redépose un A.
-    const newer = await client.uploadBackup('a', { ...info, name: 'nouveau A' }, bytes('a2'), 'f'.repeat(64));
+    const { backup: newer } = await client.uploadBackup('a', { ...info, name: 'nouveau A' }, bytes('a2'), 'f'.repeat(64));
     const merge = await client.saveMerge(bytes('fusion'), {
       fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backups: { a: a.id, b: b.id },
     }, 'e'.repeat(64));
