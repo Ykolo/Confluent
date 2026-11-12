@@ -1,4 +1,5 @@
-# Types, tests et build du site, à chaque PR et à chaque push sur master.
+# Types, tests et build du site, à chaque PR et à chaque push sur master ;
+# tests des routes de l'API sur une branche Neon éphémère (job `routes`).
 #
 # Les tests tournent sur les fausses sauvegardes de `tests/fixtures` : les
 # vraies restent sur le poste, hors du dépôt. L'app mobile ne se construit pas
@@ -65,3 +66,78 @@ jobs:
           done
           echo "GET /api/health n'a pas répondu en 30 s" >&2
           exit 1
+
+  # Les routes de l'API sur une vraie base (`web/tests/routes.test.ts`) : une
+  # branche Neon créée pour ce job à partir de `dev`, jamais de `main` (aucune
+  # donnée réelle en CI), migrée avec les migrations du commit, puis supprimée.
+  # Elle expire d'elle-même au bout de 2 h si la suppression n'a pas lieu. R2
+  # est simulé en mémoire par le test.
+  #
+  # Secrets du dépôt : NEON_API_KEY et NEON_PROJECT_ID. Sans eux (PR depuis un
+  # fork, dépôt pas encore configuré), le job le signale et passe.
+  routes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+    steps:
+      - name: Secrets Neon
+        id: neon
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::notice::NEON_API_KEY ou NEON_PROJECT_ID absent : tests des routes ignorés."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "expires=$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.neon.outputs.ready == 'true'
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.neon.outputs.ready == 'true'
+        with:
+          bun-version: 1.4.2
+
+      - if: steps.neon.outputs.ready == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Branche Neon
+        id: branch
+        if: steps.neon.outputs.ready == 'true'
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          api_key: ${{ env.NEON_API_KEY }}
+          branch_name: ci/run-${{ github.run_id }}-${{ github.run_attempt }}
+          parent_branch: dev
+          database: confluent
+          role: confluent_owner
+          expires_at: ${{ steps.neon.outputs.expires }}
+
+      - name: Migrations
+        if: steps.neon.outputs.ready == 'true'
+        working-directory: web
+        env:
+          DIRECT_URL: ${{ steps.branch.outputs.db_url }}
+        run: bunx prisma migrate deploy
+
+      - name: Tests des routes
+        if: steps.neon.outputs.ready == 'true'
+        working-directory: web
+        env:
+          ROUTE_TESTS: '1'
+          DATABASE_URL: ${{ steps.branch.outputs.db_url_pooled }}
+          BETTER_AUTH_URL: http://localhost:3000
+          BETTER_AUTH_SECRET: ci-${{ github.run_id }}-un-secret-de-test-sans-valeur
+        run: bun test tests/routes.test.ts
+
+      - name: Suppression de la branche
+        if: always() && steps.branch.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          branch: ${{ steps.branch.outputs.branch_id }}
+          api_key: ${{ env.NEON_API_KEY }}

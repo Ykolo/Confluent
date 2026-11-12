@@ -86,6 +86,10 @@ Les autres commandes :
     bun run start    # sert ce build, http://localhost:3000
     bun test         # hôte WebAssembly, module R2, purge, utilitaires d'API
 
+    # Les routes de l'API sur la branche dev (R2 simulé). En CI, sur une
+    # branche Neon éphémère : secrets NEON_API_KEY et NEON_PROJECT_ID.
+    ROUTE_TESTS=1 bun test --env-file=.env.local tests/routes.test.ts
+
 L'app mobile vise le site de production, ou celui que désigne
 `EXPO_PUBLIC_API_URL` dans le `.env` de la racine (voir
 [`.env.example`](.env.example)) : l'adresse IP du PC sur le réseau local, avec
