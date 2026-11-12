@@ -104,7 +104,7 @@ function viewFor(status: number): { title: string; message: string; hint?: strin
   if (status === 409) return { title: 'Conflit', message: 'L’opération entre en conflit avec une autre.', hint: 'Réessaie.' };
   if (status === 422) return { title: 'Envoi incomplet', message: 'Le fichier n’est pas arrivé en entier.', hint: 'Recommence l’envoi.' };
   if (status === 429) {
-    return { title: 'Trop de tentatives', message: 'Le serveur demande de patienter un peu.', hint: 'Réessaie dans une minute.' };
+    return { title: 'Trop de tentatives', message: 'Le serveur demande de patienter un peu.', hint: 'Patiente, puis réessaie.' };
   }
   if (status >= 500) {
     return { title: 'Serveur indisponible', message: 'Le serveur de Confluent n’a pas pu répondre.', hint: 'Réessaie dans quelques instants.' };

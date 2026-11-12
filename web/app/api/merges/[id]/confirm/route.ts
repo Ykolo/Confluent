@@ -9,6 +9,9 @@
  *
  * Un emplacement n'est libéré que s'il contient **encore** la sauvegarde
  * fusionnée : si une autre a été déposée pendant la fusion, elle reste.
+ *
+ * Le compte garde `MERGE_QUOTA` fusions : au-delà, les plus anciennes sont
+ * supprimées, fichier et ligne.
  */
 import { z } from 'zod';
 
@@ -22,6 +25,7 @@ import {
 } from '@/lib/api';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { enforceMergeQuota } from '@/lib/limits';
 import { head } from '@/lib/r2';
 
 const body = z.object({
@@ -78,5 +82,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     return merge;
   });
+
+  // Au-delà du quota, les plus anciennes partent. La fusion est déjà
+  // enregistrée : un échec ici se journalise sans faire échouer la réponse,
+  // et la prochaine confirmation retentera.
+  try {
+    await enforceMergeQuota(user.id);
+  } catch (err) {
+    console.error(`[quota] fusions de ${user.id} : suppression des plus anciennes en échec`, err);
+  }
   return Response.json(toMergeDto(confirmed));
 }
