@@ -94,6 +94,18 @@ function fakeServer(opts: { failWith?: (path: string, method: string) => Respons
       merges.unshift(dto);
       return json({ ...dto, slotsKept });
     }
+    m = path.match(/^\/api\/merges\/(\w+)\/promote$/);
+    if (method === 'POST' && m) {
+      const merge = merges.find((x) => x.id === m![1]);
+      if (!merge) return json({ error: 'not_found', message: 'Introuvable.' }, 404);
+      for (const b of backups) if (b.slot === 'a') b.slot = null;
+      const dto: BackupDto = {
+        id: `id${++serial}`, slot: 'a', name: merge.fileName, size: merge.size, sha256: merge.sha256, deviceName: merge.sources,
+        backupCreatedAt: merge.createdAt, counts: merge.report.totals, uploadedFrom: 'une fusion', createdAt: 'now',
+      };
+      backups.push(dto);
+      return json(dto);
+    }
     if (method === 'GET' && path === '/api/slots') {
       return json({ a: backups.find((b) => b.slot === 'a') ?? null, b: backups.find((b) => b.slot === 'b') ?? null });
     }
@@ -230,6 +242,18 @@ describe('fusions', () => {
     }, 'e'.repeat(64));
     expect(merge.slotsKept.map((k) => [k.slot, k.backup.id])).toEqual([['a', newer.id]]);
     expect(await client.slots()).toEqual({ a: newer, b: null });
+  });
+
+  test('promoteMerge place la fusion dans l’emplacement A', async () => {
+    const { client } = setup();
+    const old = (await client.uploadBackup('a', info, bytes('a'), 'f'.repeat(64))).backup;
+    const merge = await client.saveMerge(bytes('fusion'), {
+      fileName: 'Fusion.jwlibrary', report, sources: 'iPad + Pixel', strategy: 'keep-both', backups: {},
+    }, 'e'.repeat(64));
+    const a = await client.promoteMerge(merge.id);
+    expect(a).toMatchObject({ slot: 'a', name: 'Fusion.jwlibrary', size: 6, uploadedFrom: 'une fusion' });
+    expect((await client.slots()).a?.id).toBe(a.id);
+    expect(a.id).not.toBe(old.id);
   });
 
   test('merges suit le curseur jusqu’à la dernière page', async () => {

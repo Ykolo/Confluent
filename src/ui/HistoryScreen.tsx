@@ -55,6 +55,7 @@ function Entry({ entry, stored, busy, onSave, onShare, remote }: {
       {remote && entry.remoteId ? (
         <View style={styles.actions}>
           <Action label="Télécharger et partager" onPress={() => remote.onDownload(entry)} disabled={busy} />
+          <Action label="Utiliser comme A" onPress={() => remote.onPromote(entry)} disabled={busy} />
           <Action label="Supprimer" onPress={() => remote.onDelete(entry)} disabled={busy} quiet />
         </View>
       ) : stored ? (
@@ -77,6 +78,8 @@ export interface RemoteHistory {
   onMore: () => void;
   onDownload: (entry: HistoryEntry) => void;
   onDelete: (entry: HistoryEntry) => void;
+  /** Place la fusion dans l'emplacement A, pour la prochaine fusion. */
+  onPromote: (entry: HistoryEntry) => void;
 }
 
 export interface HistoryScreenProps {
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
   entryItems: { fontFamily: font.sans, fontSize: 13, color: color.inkSoft },
   entrySize: { fontFamily: font.sans, fontSize: 13, color: color.fainter },
 
-  actions: { flexDirection: 'row', gap: 18, marginTop: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 8, marginTop: 4 },
   action: {
     fontFamily: font.sansSemi,
     fontSize: 14,

@@ -24,12 +24,14 @@ export interface SummaryScreenProps {
   onClose: () => void;
   /** Enregistrement dans le compte, quand un compte est connecté. */
   cloudSave?: CloudSave | null;
+  /** Place la fusion enregistrée dans l'emplacement A, pour la prochaine fusion. */
+  onPromote?: (mergeId: string) => void;
 }
 
 export type CloudSave =
   | { state: 'saving' }
   /** `notes` : les emplacements laissés en place (voir `describeKeptSlot`). */
-  | { state: 'saved'; notes?: string[] }
+  | { state: 'saved'; notes?: string[]; mergeId?: string }
   | { state: 'error'; error: ErrorView; onRetry: () => void };
 
 /** Où en est l'enregistrement de la fusion dans le compte. */
@@ -54,7 +56,7 @@ function CloudSaveLine({ save }: { save: CloudSave }) {
 }
 
 export function SummaryScreen({
-  report, fileName, fileSize, busy, status, error, onDismissError, onDownload, onShare, onClose, cloudSave,
+  report, fileName, fileSize, busy, status, error, onDismissError, onDownload, onShare, onClose, cloudSave, onPromote,
 }: SummaryScreenProps) {
   // Les trois premières lignes sont celles de la maquette ; les suivantes
   // n'apparaissent que lorsqu'elles ont quelque chose à dire.
@@ -123,6 +125,13 @@ export function SummaryScreen({
         {status && !error && <p className={s.status} role="status">{status}</p>}
         <PrimaryButton label="Télécharger le fichier" onClick={onDownload} disabled={busy} />
         {onShare && <SecondaryButton label="Partager" onClick={onShare} disabled={busy} />}
+        {cloudSave?.state === 'saved' && cloudSave.mergeId && onPromote && (
+          <SecondaryButton
+            label="Utiliser comme nouveau A"
+            onClick={() => onPromote(cloudSave.mergeId!)}
+            disabled={busy}
+          />
+        )}
         {/*
           Télécharger n’est pas obligatoire : la fusion est faite, et quitter
           ce récapitulatif doit se dire autrement qu’avec le seul ✕.

@@ -27,6 +27,8 @@ export interface RemoteHistory {
   onMore: () => void;
   onDownload: (merge: MergeDto) => void;
   onDelete: (merge: MergeDto) => void;
+  /** Place la fusion dans l'emplacement A, pour la prochaine fusion. */
+  onPromote: (merge: MergeDto) => void;
 }
 
 export interface HistoryScreenProps {
@@ -66,10 +68,11 @@ function Entry({ name, date, sources, notes, size, action }: {
 }
 
 /** Une fusion du compte : télécharger, ou supprimer après confirmation sur place. */
-function RemoteEntry({ merge, onDownload, onDelete }: {
+function RemoteEntry({ merge, onDownload, onDelete, onPromote }: {
   merge: MergeDto;
   onDownload: () => void;
   onDelete: () => void;
+  onPromote: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const action = confirming ? (
@@ -88,6 +91,14 @@ function RemoteEntry({ merge, onDownload, onDelete }: {
         onClick={onDownload}
       >
         Télécharger
+      </button>
+      <button
+        type="button"
+        className={s.entryAction}
+        aria-label={`Utiliser ${merge.fileName} comme nouveau A`}
+        onClick={onPromote}
+      >
+        Utiliser comme A
       </button>
       <button
         type="button"
@@ -136,6 +147,7 @@ export function HistoryScreen({ entries, stored, status, error, onDismissError, 
                     merge={merge}
                     onDownload={() => remote.onDownload(merge)}
                     onDelete={() => remote.onDelete(merge)}
+                    onPromote={() => remote.onPromote(merge)}
                   />
                 </li>
               ))}
