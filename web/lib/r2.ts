@@ -15,6 +15,7 @@
 import 'server-only';
 
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   GetObjectCommand,
@@ -131,6 +132,17 @@ export async function head(key: string): Promise<number | null> {
     if ((err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
     throw err;
   }
+}
+
+/**
+ * Copie un objet dans le bucket, sans qu'il transite par le serveur. La copie
+ * est un nouvel objet : la règle de cycle de vie compte à partir d'elle.
+ */
+export async function copy(fromKey: string, toKey: string): Promise<void> {
+  const { client, bucket } = r2();
+  // La source se désigne par `{bucket}/{clé}`, chaque segment encodé pour l'URL.
+  const source = [bucket, ...fromKey.split('/')].map(encodeURIComponent).join('/');
+  await client.send(new CopyObjectCommand({ Bucket: bucket, Key: toKey, CopySource: source }));
 }
 
 /** Supprime un objet. Sans effet s'il n'existe pas. */

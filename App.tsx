@@ -447,7 +447,7 @@ function Confluent() {
       const saved = await timed('synchronisation', `enregistrement de ${job.meta.fileName}`,
         async () => cloud.saveMerge(await job.file.bytes(), job.meta, job.sha256));
       if (pendingSave.current !== job) return;
-      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot) });
+      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot), mergeId: saved.id });
       // Le serveur a libéré les emplacements consommés : l'écran suit. Un
       // emplacement redéposé entre-temps ne correspond plus au fichier affiché.
       setRemote((r) => ({
@@ -650,6 +650,46 @@ function Confluent() {
   }, [userId, tab, loadRemoteHistory]);
 
   /**
+   * Place une fusion du compte dans l'emplacement A (YKO-55), puis la lit dans
+   * la carte A : depuis le fichier déjà écrit quand on vient de la produire,
+   * sinon depuis le compte. Renvoie vrai si A la contient.
+   */
+  const promote = useCallback(async (mergeId: string, local?: File): Promise<boolean> => {
+    setError(null);
+    setStatus(null);
+    let dto: BackupDto;
+    try {
+      dto = await cloud.promoteMerge(mergeId);
+    } catch (err) {
+      setError(surface('fusion placée en A', err));
+      return false;
+    }
+    const pickNo = ++picks.current.a;
+    const lap = stopwatch('synchronisation', 'fusion placée en A');
+    setRemote((r) => ({ ...r, a: dto }));
+    setBusy(true);
+    setReading({ slot: 'a', step: local ? 'ouverture du fichier' : 'téléchargement depuis le compte' });
+    setFileA({
+      name: dto.name, size: dto.size, deviceName: dto.deviceName,
+      createdAt: dto.backupCreatedAt, counts: dto.counts, backup: null,
+    });
+    try {
+      const bytes = local ? await local.bytes() : await cloud.downloadBackup(dto);
+      await inspectInto('a', dto.name, bytes, lap);
+      setStatus(`Placée dans l’emplacement A : ${dto.name}`);
+      return true;
+    } catch (err) {
+      setFileA(null);
+      if (picks.current.a === pickNo) setRemote((r) => ({ ...r, a: null }));
+      setError(surface('fusion placée en A', err));
+      return false;
+    } finally {
+      setReading(null);
+      setBusy(false);
+    }
+  }, [inspectInto]);
+
+  /**
    * Télécharge le fichier d'une fusion du compte dans le cache, puis ouvre le
    * menu de partage : c'est par là qu'il rejoint JW Library pour la
    * restauration.
@@ -769,6 +809,7 @@ function Confluent() {
           onShare={() => void share(result.file, result.fileName)}
           onClose={closeSummary}
           cloudSave={userId ? cloudSave : null}
+          onPromote={(mergeId) => void promote(mergeId, result.file)}
         />
       ) : accountScreen === 'sign-in' ? (
         <AccountScreen onDone={() => setAccountScreen(null)} />
@@ -847,6 +888,10 @@ function Confluent() {
                   onMore: () => void loadRemoteHistory(remoteHistory?.next),
                   onDownload: (entry) => void downloadAndShare(entry),
                   onDelete: deleteRemote,
+                  // Placée en A, la fusion attend la suivante : on y retourne.
+                  onPromote: (entry) => {
+                    if (entry.remoteId) void promote(entry.remoteId).then((ok) => { if (ok) setTab('merge'); });
+                  },
                 } : undefined}
               />
             )}

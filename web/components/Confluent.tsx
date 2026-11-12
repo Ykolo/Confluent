@@ -359,7 +359,7 @@ export function Confluent() {
     try {
       const saved = await cloud.saveMerge(job.file, job.meta, job.sha256);
       if (pendingSave.current !== job) return;
-      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot) });
+      setCloudSave({ state: 'saved', notes: saved.slotsKept.map(describeKeptSlot), mergeId: saved.id });
       // Le serveur a libéré les emplacements consommés : la page suit. Un
       // emplacement redéposé entre-temps ne correspond plus au fichier affiché.
       setRemote((r) => ({
@@ -429,6 +429,40 @@ export function Confluent() {
       setError(logError('suppression d’une fusion', err));
     }
   }, []);
+
+  /**
+   * Place une fusion du compte dans l'emplacement A (YKO-55), puis la lit dans
+   * la carte A : depuis la mémoire quand on vient de la produire, sinon depuis
+   * le compte. Renvoie vrai si A la contient.
+   */
+  const promote = useCallback(async (mergeId: string, local?: Blob): Promise<boolean> => {
+    setError(null);
+    setStatus(null);
+    try {
+      const dto = await cloud.promoteMerge(mergeId);
+      const pick = ++picks.current.a;
+      setRemote((r) => ({ ...r, a: dto }));
+      const info = await read('a', {
+        name: dto.name,
+        what: 'fusion placée en A',
+        firstStep: local ? 'ouverture du fichier' : 'téléchargement depuis le compte',
+        open: local ? async () => new Uint8Array(await local.arrayBuffer()) : () => cloud.downloadBackup(dto),
+        outline: {
+          name: dto.name, size: dto.size, deviceName: dto.deviceName,
+          createdAt: dto.backupCreatedAt, counts: dto.counts, backup: null,
+        },
+      });
+      if (!info) {
+        if (picks.current.a === pick) setRemote((r) => ({ ...r, a: null }));
+        return false;
+      }
+      setStatus(`Placée dans l’emplacement A : ${dto.name}`);
+      return true;
+    } catch (err) {
+      setError(logError('fusion placée en A', err));
+      return false;
+    }
+  }, [read]);
 
   const merge = useCallback(async () => {
     const baseBackup = backups.current.a;
@@ -573,6 +607,7 @@ export function Confluent() {
           onShare={shareable ? () => void share() : undefined}
           onClose={closeSummary}
           cloudSave={userId ? cloudSave : null}
+          onPromote={(mergeId) => void promote(mergeId, result.file)}
         />
       ) : accountScreen === 'sign-in' ? (
         <AccountScreen onDone={() => setAccountScreen(null)} />
@@ -627,6 +662,8 @@ export function Confluent() {
                   onMore: () => void loadRemoteHistory(remoteHistory?.next),
                   onDownload: (m) => void downloadRemote(m),
                   onDelete: (m) => void deleteRemote(m),
+                  // Placée en A, la fusion attend la suivante : on y retourne.
+                  onPromote: (m) => void promote(m.id).then((ok) => { if (ok) setTab('merge'); }),
                 } : undefined}
               />
             )}

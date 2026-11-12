@@ -56,6 +56,8 @@ export interface CloudClient {
   merges(cursor?: string): Promise<MergePage>;
   /** Lien de téléchargement de 5 minutes, sous le nom du fichier. */
   downloadUrl(kind: UploadKind, id: string): Promise<string>;
+  /** Place une fusion du compte dans l'emplacement A, pour la prochaine fusion. */
+  promoteMerge(id: string): Promise<BackupDto>;
   /** Vide un emplacement. */
   clearSlot(slot: Slot): Promise<void>;
   /** Retire une fusion de l'historique, fichier compris. */
@@ -239,6 +241,8 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
       const link = await call<DownloadLink>('GET', `/api/files/${kind}/${encodeURIComponent(id)}`);
       return link.url;
     },
+
+    promoteMerge: (id) => call<BackupDto>('POST', `/api/merges/${encodeURIComponent(id)}/promote`),
 
     clearSlot: (slot) => call<void>('DELETE', `/api/slots/${slot}`),
 

@@ -11,7 +11,7 @@ import { Card, ErrorNotice, Eyebrow, PrimaryButton, SecondaryButton } from './ki
 export type CloudSave =
   | { state: 'saving' }
   /** `notes` : les emplacements laissés en place (voir `describeKeptSlot`). */
-  | { state: 'saved'; notes?: string[] }
+  | { state: 'saved'; notes?: string[]; mergeId?: string }
   | { state: 'error'; error: ErrorView; onRetry: () => void };
 
 function CloudSaveLine({ save }: { save: CloudSave }) {
@@ -70,11 +70,13 @@ export interface SummaryScreenProps {
   onClose: () => void;
   /** Enregistrement dans le compte, quand un compte est connecté. */
   cloudSave?: CloudSave | null;
+  /** Place la fusion enregistrée dans l'emplacement A, pour la prochaine fusion. */
+  onPromote?: (mergeId: string) => void;
 }
 
 export function SummaryScreen({
   report, fileName, fileSize, busy, status, error, onDismissError, onSave, onOpenInJwLibrary,
-  onShare, onClose, cloudSave,
+  onShare, onClose, cloudSave, onPromote,
 }: SummaryScreenProps) {
   // Les trois premières lignes sont celles de la maquette ; les suivantes
   // n'apparaissent que lorsqu'elles ont quelque chose à dire.
@@ -151,6 +153,13 @@ export function SummaryScreen({
         */}
         <SecondaryButton label="Ouvrir dans JW Library" onPress={onOpenInJwLibrary} disabled={busy} />
         <SecondaryButton label="Partager" onPress={onShare} disabled={busy} />
+        {cloudSave?.state === 'saved' && cloudSave.mergeId && onPromote && (
+          <SecondaryButton
+            label="Utiliser comme nouveau A"
+            onPress={() => onPromote(cloudSave.mergeId!)}
+            disabled={busy}
+          />
+        )}
         {/*
           Ni enregistrer ni partager n'est obligatoire : la fusion est déjà
           faite et le fichier est déjà écrit. Le ✕ de l'en-tête permettait
