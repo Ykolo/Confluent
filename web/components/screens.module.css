@@ -444,6 +444,28 @@
   margin-top: 26px;
 }
 
+.accountQuiet { color: var(--faint); }
+
+/* Suppression du compte : ce qui part, ce qui reste. */
+.deleteEmail {
+  font-weight: 600;
+  color: var(--inkSoft);
+  overflow-wrap: anywhere;
+}
+.deleteList {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--inkSoft);
+}
+.deleteNote {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+
 /* --- Emplacements synchronisés : ligne du compte sous la carte, case à cocher --- */
 
 .cloudRow {

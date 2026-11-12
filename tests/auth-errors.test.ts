@@ -20,6 +20,12 @@ describe('describeAuthError', () => {
     expect(describeAuthError({ code: 'PASSWORD_TOO_SHORT', status: 400 }).message).toContain(`${MIN_PASSWORD} caractères`);
   });
 
+  test('suppression du compte : mot de passe faux, manquant, fichiers non effacés', () => {
+    expect(describeAuthError({ code: 'INVALID_PASSWORD', status: 400 }).hint).toBe('Le compte n’a pas été supprimé.');
+    expect(describeAuthError({ code: 'PASSWORD_REQUIRED', status: 400 }).title).toBe('Mot de passe requis');
+    expect(describeAuthError({ code: 'STORAGE_PURGE_FAILED', status: 503 }).message).toContain('ton compte est donc conservé');
+  });
+
   test('429 : trop de tentatives', () => {
     expect(describeAuthError({ status: 429, message: 'Too many requests' }).title).toBe('Trop de tentatives');
   });

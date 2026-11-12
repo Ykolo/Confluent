@@ -18,6 +18,7 @@
 
 .primary,
 .secondary,
+.danger,
 .dashed {
   display: flex;
   width: 100%;
@@ -28,6 +29,7 @@
 }
 .primary:disabled,
 .secondary:disabled,
+.danger:disabled,
 .dashed:disabled,
 .text:disabled {
   opacity: 0.5;
@@ -55,6 +57,18 @@
   color: var(--inkSoft);
 }
 .secondary:not(:disabled):hover { border-color: var(--faint); }
+
+/* Action irréversible : la couleur des erreurs, sans le plein de l'action principale. */
+.danger {
+  border: 1px solid var(--dangerBorder);
+  border-radius: var(--radius-button);
+  padding-block: 18px;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--danger);
+}
+.danger:not(:disabled):hover,
+.danger:not(:disabled):active { background: var(--dangerSurface); }
 
 .dashed {
   border: 1px dashed var(--outline);

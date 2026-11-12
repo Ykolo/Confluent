@@ -48,6 +48,26 @@ const VIEWS: Record<string, Omit<ErrorView, 'technical'>> = {
     message: 'Le mot de passe dépasse la longueur autorisée.',
     hint: 'Choisis-en un plus court.',
   },
+  // Suppression du compte.
+  INVALID_PASSWORD: {
+    title: 'Mot de passe incorrect',
+    message: 'Ce n’est pas le mot de passe de ce compte.',
+    hint: 'Le compte n’a pas été supprimé.',
+  },
+  PASSWORD_REQUIRED: {
+    title: 'Mot de passe requis',
+    message: 'Saisis ton mot de passe pour confirmer la suppression.',
+  },
+  STORAGE_PURGE_FAILED: {
+    title: 'Suppression interrompue',
+    message: 'Tes fichiers n’ont pas pu être effacés du serveur : ton compte est donc conservé.',
+    hint: 'Réessaie dans quelques minutes.',
+  },
+  SESSION_EXPIRED: {
+    title: 'Session expirée',
+    message: 'Ta session a expiré.',
+    hint: 'Déconnecte-toi, reconnecte-toi, puis recommence.',
+  },
 };
 
 export function describeAuthError(err: AuthFailure | null | undefined): ErrorView {

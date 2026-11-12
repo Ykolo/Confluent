@@ -48,6 +48,11 @@ export function SecondaryButton({ label, onClick, disabled }: ButtonProps) {
   return <button type="button" className={s.secondary} onClick={onClick} disabled={disabled}>{label}</button>;
 }
 
+/** Action irréversible (« Supprimer définitivement »). `submit` dans un formulaire. */
+export function DangerButton({ label, onClick, disabled, type = 'button' }: ButtonProps & { type?: 'button' | 'submit' }) {
+  return <button type={type} className={s.danger} onClick={onClick} disabled={disabled}>{label}</button>;
+}
+
 export function DashedButton({ label, onClick, disabled }: ButtonProps) {
   return <button type="button" className={s.dashed} onClick={onClick} disabled={disabled}>{label}</button>;
 }

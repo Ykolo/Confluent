@@ -44,6 +44,7 @@ import type { BackupDto, MergeMeta, MergePage } from './src/cloud/types';
 import { cloud } from './src/platform/cloud-expo';
 import { describeAuthError } from './src/auth-errors';
 import { AccountScreen } from './src/ui/AccountScreen';
+import { DeleteAccountScreen } from './src/ui/DeleteAccountScreen';
 import { HistoryScreen } from './src/ui/HistoryScreen';
 import { HomeScreen, type CloudLine } from './src/ui/HomeScreen';
 import { Segmented, TextLink } from './src/ui/kit';
@@ -719,7 +720,7 @@ function Confluent() {
   }, []);
 
   // Le compte, facultatif : une ligne discrète au-dessus de l'écran.
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'delete' | null>(null);
   const logout = useCallback(async () => {
     setError(null);
     try {
@@ -760,8 +761,14 @@ function Confluent() {
           onClose={closeSummary}
           cloudSave={userId ? cloudSave : null}
         />
-      ) : accountOpen ? (
-        <AccountScreen onDone={() => setAccountOpen(false)} />
+      ) : accountScreen === 'sign-in' ? (
+        <AccountScreen onDone={() => setAccountScreen(null)} />
+      ) : accountScreen === 'delete' && email ? (
+        <DeleteAccountScreen
+          email={email}
+          onCancel={() => setAccountScreen(null)}
+          onDeleted={() => setAccountScreen(null)}
+        />
       ) : (
         <>
           {/* Rien tant que la session n'est pas connue : pas de clignotement. */}
@@ -770,12 +777,19 @@ function Confluent() {
               <>
                 <Text style={styles.accountEmail} numberOfLines={1}>{email}</Text>
                 <TextLink small label="Se déconnecter" onPress={() => void logout()} disabled={busy} />
+                <TextLink
+                  small
+                  quiet
+                  label="Supprimer le compte"
+                  onPress={() => { setError(null); setAccountScreen('delete'); }}
+                  disabled={busy}
+                />
               </>
             ) : (
               <TextLink
                 small
                 label="Se connecter pour synchroniser"
-                onPress={() => { setError(null); setAccountOpen(true); }}
+                onPress={() => { setError(null); setAccountScreen('sign-in'); }}
                 disabled={busy}
               />
             ))}
