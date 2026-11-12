@@ -88,7 +88,12 @@ Le client Prisma est généré au `bun install` (`web/generated/`, non commité)
 Pour faire évoluer le schéma, depuis `web/` avec `.env.local` rempli :
 
     bunx prisma migrate dev --name <changement>   # sur la branche dev
-    bunx prisma migrate deploy                    # sur main, au déploiement
+
+En production, le script `vercel-build` lance `prisma migrate deploy` avant
+le build, avec le `DIRECT_URL` de Vercel : la branche `main` suit `master`.
+Une migration qui échoue fait échouer le déploiement, et l'ancienne version
+reste en ligne. Les Previews ne migrent pas : elles utilisent la branche
+`dev`, migrée pendant le développement par `prisma migrate dev`.
 
 Deux particularités de l'hôte navigateur :
 
