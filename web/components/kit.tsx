@@ -4,6 +4,7 @@
  */
 'use client';
 
+import { Eye, EyeOff } from 'lucide-react';
 import { useState, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 
 import type { ErrorView } from '@core/errors';
@@ -48,9 +49,88 @@ export function SecondaryButton({ label, onClick, disabled }: ButtonProps) {
   return <button type="button" className={s.secondary} onClick={onClick} disabled={disabled}>{label}</button>;
 }
 
-/** Action irréversible (« Supprimer définitivement »). `submit` dans un formulaire. */
-export function DangerButton({ label, onClick, disabled, type = 'button' }: ButtonProps & { type?: 'button' | 'submit' }) {
-  return <button type={type} className={s.danger} onClick={onClick} disabled={disabled}>{label}</button>;
+/**
+ * Action irréversible (« Supprimer définitivement »). `submit` dans un
+ * formulaire. `solid` : fond rouge plein, pour le bouton qui ouvre la
+ * confirmation au bas de « Mon compte ».
+ */
+export function DangerButton({ label, onClick, disabled, type = 'button', solid }: ButtonProps & {
+  type?: 'button' | 'submit';
+  solid?: boolean;
+}) {
+  return (
+    <button type={type} className={`${s.danger} ${solid ? s.dangerSolid : ''}`} onClick={onClick} disabled={disabled}>
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Bouton fait d'une seule icône. `label` est lu par les lecteurs d'écran ;
+ * `tip` (par défaut `label`) s'affiche en infobulle au survol comme au
+ * focus clavier.
+ */
+export function IconButton({ label, tip, icon, onClick, disabled, tone = 'default' }: {
+  label: string;
+  tip?: string;
+  icon: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  tone?: 'default' | 'accent' | 'danger';
+}) {
+  return (
+    <button
+      type="button"
+      className={`${s.iconButton} ${tone !== 'default' ? s[`icon_${tone}`] : ''}`}
+      aria-label={label}
+      data-tip={tip ?? label}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {icon}
+    </button>
+  );
+}
+
+/**
+ * Champ mot de passe, avec un bouton œil pour l'afficher en clair. `error`
+ * s'affiche sous le champ et le marque invalide.
+ */
+export function PasswordField({ label, hint, error, ...input }: {
+  label: string;
+  hint?: string;
+  error?: string | null;
+} & Pick<InputHTMLAttributes<HTMLInputElement>,
+  'value' | 'onChange' | 'autoComplete' | 'required' | 'minLength' | 'disabled' | 'name' | 'autoFocus'>) {
+  const [visible, setVisible] = useState(false);
+  const describedBy = input.name ? `${input.name}-message` : undefined;
+  return (
+    <label className={s.field}>
+      <span className={s.fieldLabel}>{label}</span>
+      <span className={s.passwordWrap}>
+        <input
+          className={`${s.input} ${s.passwordInput}`}
+          type={visible ? 'text' : 'password'}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || hint ? describedBy : undefined}
+          {...input}
+        />
+        <button
+          type="button"
+          className={s.reveal}
+          aria-label={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          aria-pressed={visible}
+          onClick={() => setVisible((v) => !v)}
+          disabled={input.disabled}
+        >
+          {visible ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
+        </button>
+      </span>
+      {error
+        ? <span id={describedBy} className={s.fieldError} role="alert">{error}</span>
+        : hint && <span id={describedBy} className={s.fieldHint}>{hint}</span>}
+    </label>
+  );
 }
 
 export function DashedButton({ label, onClick, disabled }: ButtonProps) {

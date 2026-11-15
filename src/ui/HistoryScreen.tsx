@@ -5,13 +5,14 @@
  * compte, depuis n'importe quel appareil, à télécharger puis partager (vers
  * JW Library, pour restaurer) ou à supprimer.
  */
+import { Download, Trash2 } from 'lucide-react-native';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { ErrorView } from '../errors';
 import * as fmt from '../format';
 import type { HistoryEntry } from '../history';
 import { color, font, space } from '../theme';
-import { Card, ErrorNotice, SecondaryButton } from './kit';
+import { Card, ErrorNotice, IconButton, SecondaryButton } from './kit';
 
 function Action({ label, onPress, disabled, quiet }: {
   label: string;
@@ -54,9 +55,19 @@ function Entry({ entry, stored, busy, onSave, onShare, remote }: {
       </View>
       {remote && entry.remoteId ? (
         <View style={styles.actions}>
-          <Action label="Télécharger et partager" onPress={() => remote.onDownload(entry)} disabled={busy} />
+          <IconButton
+            label={`Télécharger et partager ${entry.name}`}
+            icon={<Download size={20} color={color.accent} />}
+            onPress={() => remote.onDownload(entry)}
+            disabled={busy}
+          />
           <Action label="Utiliser comme A" onPress={() => remote.onPromote(entry)} disabled={busy} />
-          <Action label="Supprimer" onPress={() => remote.onDelete(entry)} disabled={busy} quiet />
+          <IconButton
+            label={`Supprimer ${entry.name}`}
+            icon={<Trash2 size={20} color={color.faint} />}
+            onPress={() => remote.onDelete(entry)}
+            disabled={busy}
+          />
         </View>
       ) : stored ? (
         <View style={styles.actions}>
@@ -176,7 +187,7 @@ const styles = StyleSheet.create({
   entryItems: { fontFamily: font.sans, fontSize: 13, color: color.inkSoft },
   entrySize: { fontFamily: font.sans, fontSize: 13, color: color.fainter },
 
-  actions: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 18, rowGap: 8, marginTop: 4 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 8, marginTop: 4 },
   action: {
     fontFamily: font.sansSemi,
     fontSize: 14,

@@ -1,7 +1,7 @@
 /** Les erreurs de Better Auth, telles que l'écran de connexion les affiche. */
 import { describe, expect, test } from 'bun:test';
 
-import { describeAuthError, MIN_PASSWORD } from '../src/auth-errors';
+import { confirmationError, describeAuthError, MIN_PASSWORD } from '../src/auth-errors';
 
 describe('describeAuthError', () => {
   test('identifiants faux : message en français, l’anglais dans le détail', () => {
@@ -39,5 +39,16 @@ describe('describeAuthError', () => {
     const view = describeAuthError({ code: 'SOMETHING_NEW', status: 500 });
     expect(view.title).toBe('Connexion impossible');
     expect(view.technical).toBe('500 · SOMETHING_NEW');
+  });
+});
+
+describe('confirmationError', () => {
+  test('rien tant que la confirmation est vide ou identique', () => {
+    expect(confirmationError('secret-123', '')).toBeNull();
+    expect(confirmationError('secret-123', 'secret-123')).toBeNull();
+  });
+
+  test('un message dès que les deux diffèrent', () => {
+    expect(confirmationError('secret-123', 'secret-12')).toBe('Les deux mots de passe ne sont pas identiques.');
   });
 });

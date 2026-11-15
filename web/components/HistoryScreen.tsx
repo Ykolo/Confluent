@@ -7,6 +7,7 @@
  */
 'use client';
 
+import { Download, Trash2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type { MergeDto } from '@core/cloud/types';
@@ -15,7 +16,7 @@ import * as fmt from '@core/format';
 
 import type { HistoryEntry } from '@/lib/history';
 
-import { Card, ErrorNotice, SecondaryButton, Spinner } from './kit';
+import { Card, ErrorNotice, IconButton, SecondaryButton, Spinner } from './kit';
 import s from './screens.module.css';
 
 /** L'historique du compte, quand un compte est connecté. */
@@ -84,14 +85,13 @@ function RemoteEntry({ merge, onDownload, onDelete, onPromote }: {
     </span>
   ) : (
     <span className={s.entryActions}>
-      <button
-        type="button"
-        className={s.entryAction}
-        aria-label={`Télécharger ${merge.fileName}`}
+      <IconButton
+        label={`Télécharger ${merge.fileName}`}
+        tip="Télécharger"
+        tone="accent"
+        icon={<Download size={18} aria-hidden />}
         onClick={onDownload}
-      >
-        Télécharger
-      </button>
+      />
       <button
         type="button"
         className={s.entryAction}
@@ -100,14 +100,13 @@ function RemoteEntry({ merge, onDownload, onDelete, onPromote }: {
       >
         Utiliser comme A
       </button>
-      <button
-        type="button"
-        className={`${s.entryAction} ${s.entryQuiet}`}
-        aria-label={`Supprimer ${merge.fileName}`}
+      <IconButton
+        label={`Supprimer ${merge.fileName}`}
+        tip="Supprimer"
+        tone="danger"
+        icon={<Trash2 size={18} aria-hidden />}
         onClick={() => setConfirming(true)}
-      >
-        Supprimer
-      </button>
+      />
     </span>
   );
   return (
@@ -176,14 +175,15 @@ export function HistoryScreen({ entries, stored, status, error, onDismissError, 
                 notes={entry.notes}
                 size={entry.size}
                 action={stored.has(entry.id) ? (
-                  <button
-                    type="button"
-                    className={s.entryAction}
-                    aria-label={`Télécharger ${entry.name}`}
-                    onClick={() => onDownload(entry)}
-                  >
-                    Télécharger
-                  </button>
+                  <span className={s.entryActions}>
+                    <IconButton
+                      label={`Télécharger ${entry.name}`}
+                      tip="Télécharger"
+                      tone="accent"
+                      icon={<Download size={18} aria-hidden />}
+                      onClick={() => onDownload(entry)}
+                    />
+                  </span>
                 ) : (
                   <span className={s.entryGone}>Fichier non conservé</span>
                 )}

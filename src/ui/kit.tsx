@@ -8,6 +8,8 @@ import {
   type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 
+import { Eye, EyeOff } from 'lucide-react-native';
+
 import type { ErrorView } from '../errors';
 import { color, font, radius, shadow, text } from '../theme';
 
@@ -66,15 +68,48 @@ export function SecondaryButton(props: { label: ReactNode; onPress?: () => void;
   );
 }
 
-/** Action irréversible (« Supprimer définitivement »). */
-export function DangerButton(props: { label: ReactNode; onPress?: () => void; disabled?: boolean }) {
+/**
+ * Action irréversible (« Supprimer définitivement »). `solid` : fond rouge
+ * plein, pour le bouton qui ouvre la confirmation au bas de « Mon compte ».
+ */
+export function DangerButton({ solid, ...props }: {
+  label: ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+  solid?: boolean;
+}) {
   return (
     <Button
       {...props}
-      base={styles.danger}
-      pressed={styles.dangerPressed}
-      labelStyle={styles.dangerLabel}
+      base={solid ? styles.dangerSolid : styles.danger}
+      pressed={solid ? styles.dangerSolidPressed : styles.dangerPressed}
+      labelStyle={solid ? styles.dangerSolidLabel : styles.dangerLabel}
     />
+  );
+}
+
+/**
+ * Bouton fait d'une seule icône. Sans survol sur un téléphone, pas
+ * d'infobulle : `label` est lu par le lecteur d'écran.
+ */
+export function IconButton({ label, icon, onPress, disabled }: {
+  label: string;
+  icon: ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed, disabled && styles.disabled]}
+    >
+      {icon}
+    </Pressable>
   );
 }
 
@@ -129,6 +164,51 @@ export function TextField({ label, hint, ...input }: { label: string; hint?: str
         style={[styles.input, focused && styles.inputFocused, input.editable === false && styles.disabled]}
       />
       {hint && <Text style={styles.fieldHint}>{hint}</Text>}
+    </View>
+  );
+}
+
+/**
+ * Champ mot de passe, avec un bouton œil pour l'afficher en clair. `error`
+ * s'affiche sous le champ et le borde de rouge.
+ */
+export function PasswordField({ label, hint, error, ...input }: { label: string; hint?: string; error?: string | null }
+  & Pick<TextInputProps, 'value' | 'onChangeText' | 'autoComplete' | 'textContentType'
+  | 'editable' | 'onSubmitEditing' | 'returnKeyType' | 'autoFocus'>) {
+  const [focused, setFocused] = useState(false);
+  const [visible, setVisible] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View>
+        <TextInput
+          {...input}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          accessibilityLabel={label}
+          placeholderTextColor={color.fainter}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={[
+            styles.input, styles.passwordInput, focused && styles.inputFocused,
+            !!error && styles.inputError, input.editable === false && styles.disabled,
+          ]}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={visible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          accessibilityState={{ selected: visible }}
+          onPress={() => setVisible((v) => !v)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.reveal, pressed && styles.iconButtonPressed]}
+        >
+          {visible ? <EyeOff size={20} color={color.muted} /> : <Eye size={20} color={color.muted} />}
+        </Pressable>
+      </View>
+      {error
+        ? <Text style={styles.fieldError} accessibilityLiveRegion="polite">{error}</Text>
+        : hint && <Text style={styles.fieldHint}>{hint}</Text>}
     </View>
   );
 }
@@ -321,6 +401,25 @@ const styles = StyleSheet.create({
   },
   dangerPressed: { backgroundColor: color.dangerSurface },
   dangerLabel: { fontFamily: font.sansSemi, fontSize: 16, color: color.danger },
+  dangerSolid: {
+    backgroundColor: color.danger,
+    borderRadius: radius.button,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dangerSolidPressed: { opacity: 0.85 },
+  dangerSolidLabel: { fontFamily: font.sansSemi, fontSize: 16, color: color.onAccent },
+  iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  iconButtonPressed: { backgroundColor: color.border },
+  passwordInput: { paddingRight: 52 },
+  inputError: { borderColor: color.danger },
+  reveal: {
+    position: 'absolute', right: 6, top: 0, bottom: 0, width: 40,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fieldError: { fontFamily: font.sans, fontSize: 12, lineHeight: 17, color: color.danger },
   linkQuiet: { color: color.faint },
 
   dashed: {

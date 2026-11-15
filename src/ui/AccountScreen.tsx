@@ -9,10 +9,10 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { signIn, signUp } from '../auth-client';
-import { describeAuthError, MIN_PASSWORD } from '../auth-errors';
+import { confirmationError, describeAuthError, MIN_PASSWORD } from '../auth-errors';
 import { logError, type ErrorView } from '../errors';
 import { space, text } from '../theme';
-import { ErrorNotice, Eyebrow, PrimaryButton, Segmented, TextField, TextLink } from './kit';
+import { ErrorNotice, Eyebrow, PasswordField, PrimaryButton, Segmented, TextField, TextLink } from './kit';
 
 type Mode = 'sign-in' | 'sign-up';
 
@@ -25,11 +25,15 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorView | null>(null);
 
   const signingUp = mode === 'sign-up';
-  const ready = !!email.trim() && password.length > 0 && (!signingUp || password.length >= MIN_PASSWORD);
+  const mismatch = signingUp ? confirmationError(password, confirmation) : null;
+  // Le compte n'est créé que si les deux saisies concordent.
+  const ready = !!email.trim() && password.length > 0
+    && (!signingUp || (password.length >= MIN_PASSWORD && confirmation === password));
 
   const submit = async () => {
     if (!ready || busy) return;
@@ -74,7 +78,7 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
           <Segmented
             options={MODES}
             value={mode}
-            onChange={(next) => { setMode(next); setError(null); }}
+            onChange={(next) => { setMode(next); setError(null); setConfirmation(''); }}
             disabled={busy}
           />
           <TextField
@@ -89,19 +93,30 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
             returnKeyType="next"
             editable={!busy}
           />
-          <TextField
+          <PasswordField
             label="Mot de passe"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
             autoComplete={signingUp ? 'new-password' : 'current-password'}
             textContentType={signingUp ? 'newPassword' : 'password'}
             hint={signingUp ? `${MIN_PASSWORD} caractères au moins.` : undefined}
-            returnKeyType="go"
-            onSubmitEditing={() => void submit()}
+            returnKeyType={signingUp ? 'next' : 'go'}
+            onSubmitEditing={signingUp ? undefined : () => void submit()}
             editable={!busy}
           />
+          {signingUp && (
+            <PasswordField
+              label="Confirmer le mot de passe"
+              value={confirmation}
+              onChangeText={setConfirmation}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              error={mismatch}
+              returnKeyType="go"
+              onSubmitEditing={() => void submit()}
+              editable={!busy}
+            />
+          )}
 
           {error && <ErrorNotice error={error} onDismiss={() => setError(null)} />}
 

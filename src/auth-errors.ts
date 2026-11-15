@@ -18,6 +18,16 @@ export interface AuthFailure {
 /** Longueur minimale d'un mot de passe, celle de Better Auth par défaut. */
 export const MIN_PASSWORD = 8;
 
+/**
+ * Le message à afficher sous « Confirmer le mot de passe », ou `null` quand
+ * l'inscription peut partir. Rien tant que la confirmation est vide : on ne
+ * gronde pas quelqu'un qui n'a pas encore tapé.
+ */
+export function confirmationError(password: string, confirmation: string): string | null {
+  if (!confirmation || confirmation === password) return null;
+  return 'Les deux mots de passe ne sont pas identiques.';
+}
+
 const VIEWS: Record<string, Omit<ErrorView, 'technical'>> = {
   INVALID_EMAIL_OR_PASSWORD: {
     title: 'Connexion refusée',
