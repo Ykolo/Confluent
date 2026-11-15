@@ -7,6 +7,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { CloudError, createCloudClient } from '../src/cloud/client';
+import { deferred, ReadAborted } from '../src/deferred';
 import { describeKeptSlot, type BackupDto, type MergeDto } from '../src/cloud/types';
 import { describeError } from '../src/errors';
 
@@ -184,6 +185,29 @@ describe('parcours de dépôt', () => {
     expect(server.seen.map((s) => `${s.method} ${s.url.replace(/^https:\/\/[^/]+/, '')}`)).toEqual(['POST /api/uploads']);
     // Même fichier, autre emplacement : il est déposé.
     expect((await client.uploadBackup('b', info, file, sha)).alreadyThere).toBe(false);
+  });
+
+  test('l’envoi part pendant la lecture ; seule la confirmation attend les compteurs', async () => {
+    const { server, client } = setup();
+    const meta = deferred<typeof info>();
+    const upload = client.uploadBackup('a', meta.promise, bytes('en lecture'), 'c'.repeat(64));
+    // Laisser le ticket et l'envoi vers R2 se faire.
+    for (let i = 0; i < 20 && !server.seen.some((s) => s.method === 'PUT'); i++) await new Promise((r) => setTimeout(r, 0));
+    expect(server.seen.map((s) => s.method)).toEqual(['POST', 'PUT']);
+    meta.resolve(info);
+    const { backup } = await upload;
+    expect(backup).toMatchObject({ slot: 'a', name: info.name });
+    expect(server.seen.at(-1)?.url).toEndWith(`/api/backups/${backup.id}/confirm`);
+  });
+
+  test('lecture ratée : pas de confirmation, l’emplacement reste vide', async () => {
+    const { server, client } = setup();
+    const meta = deferred<typeof info>();
+    const upload = client.uploadBackup('a', meta.promise, bytes('illisible'), 'd'.repeat(64));
+    meta.reject(new ReadAborted());
+    await expect(upload).rejects.toBeInstanceOf(ReadAborted);
+    expect(server.seen.some((s) => s.url.endsWith('/confirm'))).toBe(false);
+    expect((await client.slots()).a).toBeNull();
   });
 
   test('R2 ne reçoit ni cookie ni identifiants ; l’API reçoit la session', async () => {
