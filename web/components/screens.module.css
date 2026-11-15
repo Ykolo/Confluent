@@ -420,12 +420,6 @@
   font-size: 13px;
   color: var(--muted);
 }
-.accountEmail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
 .accountLink {
   flex: none;
   padding: 4px;
@@ -437,14 +431,52 @@
 .accountLink:not(:disabled):hover { color: var(--inkSoft); }
 .accountLink:disabled { opacity: 0.5; }
 
+/* Mon compte : la suppression, à l'écart en bas de l'écran. */
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.dangerTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+/* Boîte de confirmation (`<dialog>` modal). */
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  color: var(--ink);
+}
+.dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+.dialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+.dialogTitle {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 400;
+}
+
 .authForm {
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin-top: 26px;
 }
-
-.accountQuiet { color: var(--faint); }
 
 /* Suppression du compte : ce qui part, ce qui reste. */
 .deleteEmail {
@@ -503,8 +535,9 @@
 .entryActions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 4px 14px;
+  gap: 4px 10px;
   margin-left: auto;
 }
 .entryActions .entryAction {

@@ -11,8 +11,8 @@ import {
 } from './kit';
 
 const STRATEGIES = [
-  { value: 'keep-both', label: 'Tout garder' },
   { value: 'newest', label: 'Version récente' },
+  { value: 'keep-both', label: 'Tout garder' },
 ] as const satisfies readonly { value: ConflictStrategy; label: string }[];
 
 /** Ce que le compte sait d'un emplacement, affiché sous sa carte. */

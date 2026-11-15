@@ -6,6 +6,7 @@
  * l'historique des fusions faites sur l'appareil.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CircleUser } from 'lucide-react-native';
 import {
   ActivityIndicator, Alert, AppState, Platform, StatusBar, StyleSheet, Text, View,
 } from 'react-native';
@@ -44,10 +45,10 @@ import { describeKeptSlot, type BackupDto, type MergeMeta, type MergePage } from
 import { cloud } from './src/platform/cloud-expo';
 import { describeAuthError } from './src/auth-errors';
 import { AccountScreen } from './src/ui/AccountScreen';
-import { DeleteAccountScreen } from './src/ui/DeleteAccountScreen';
+import { MyAccountScreen } from './src/ui/MyAccountScreen';
 import { HistoryScreen } from './src/ui/HistoryScreen';
 import { HomeScreen, type CloudLine } from './src/ui/HomeScreen';
-import { Segmented, TextLink } from './src/ui/kit';
+import { IconButton, Segmented, TextLink } from './src/ui/kit';
 import { SummaryScreen, type CloudSave } from './src/ui/SummaryScreen';
 
 type Slot = 'a' | 'b';
@@ -129,7 +130,7 @@ function Confluent() {
   const [tab, setTab] = useState<Tab>('merge');
   const [fileA, setFileA] = useState<BackupInfo | null>(null);
   const [fileB, setFileB] = useState<BackupInfo | null>(null);
-  const [strategy, setStrategy] = useState<ConflictStrategy>('keep-both');
+  const [strategy, setStrategy] = useState<ConflictStrategy>('newest');
 
   const [busy, setBusy] = useState(false);
   /** Emplacement en cours de lecture, et phase atteinte, pour l'afficher. */
@@ -768,8 +769,10 @@ function Confluent() {
     setError(null);
   }, []);
 
-  // Le compte, facultatif : une ligne discrète au-dessus de l'écran.
-  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'delete' | null>(null);
+  // Le compte, facultatif : une icône discrète au-dessus de l'écran mène à
+  // « Mon compte » (déconnexion, suppression).
+  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'account' | null>(null);
+  /** Depuis Mon compte : déconnecte, puis mène à l'écran de connexion. */
   const logout = useCallback(async () => {
     setError(null);
     try {
@@ -777,9 +780,13 @@ function Confluent() {
       if (failure) {
         const view = describeAuthError(failure);
         setError(logError('déconnexion', new Error(view.technical), view));
+        setAccountScreen(null);
+        return;
       }
+      setAccountScreen('sign-in');
     } catch (err) {
       setError(logError('déconnexion', err, describeAuthError({ message: String(err) })));
+      setAccountScreen(null);
     }
   }, []);
   const email = session.data?.user.email ?? null;
@@ -813,10 +820,12 @@ function Confluent() {
         />
       ) : accountScreen === 'sign-in' ? (
         <AccountScreen onDone={() => setAccountScreen(null)} />
-      ) : accountScreen === 'delete' && email ? (
-        <DeleteAccountScreen
+      ) : accountScreen === 'account' && email ? (
+        <MyAccountScreen
           email={email}
-          onCancel={() => setAccountScreen(null)}
+          busy={busy}
+          onBack={() => setAccountScreen(null)}
+          onSignOut={() => void logout()}
           onDeleted={() => setAccountScreen(null)}
         />
       ) : (
@@ -824,17 +833,12 @@ function Confluent() {
           {/* Rien tant que la session n'est pas connue : pas de clignotement. */}
           <View style={styles.account}>
             {!session.isPending && (email ? (
-              <>
-                <Text style={styles.accountEmail} numberOfLines={1}>{email}</Text>
-                <TextLink small label="Se déconnecter" onPress={() => void logout()} disabled={busy} />
-                <TextLink
-                  small
-                  quiet
-                  label="Supprimer le compte"
-                  onPress={() => { setError(null); setAccountScreen('delete'); }}
-                  disabled={busy}
-                />
-              </>
+              <IconButton
+                label="Mon compte"
+                icon={<CircleUser size={24} color={color.muted} />}
+                onPress={() => { setError(null); setAccountScreen('account'); }}
+                disabled={busy}
+              />
             ) : (
               <TextLink
                 small
@@ -926,6 +930,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     paddingTop: 10,
   },
-  accountEmail: { flexShrink: 1, fontFamily: font.sans, fontSize: 13, color: color.muted },
   tabs: { paddingHorizontal: 26, paddingTop: 10, paddingBottom: 8 },
 });

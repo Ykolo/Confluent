@@ -12,9 +12,9 @@ import { useState, type FormEvent } from 'react';
 import { logError, type ErrorView } from '@core/errors';
 
 import { signIn, signUp } from '@/lib/auth-client';
-import { describeAuthError, MIN_PASSWORD } from '@core/auth-errors';
+import { confirmationError, describeAuthError, MIN_PASSWORD } from '@core/auth-errors';
 
-import { ErrorNotice, Eyebrow, PrimaryButton, Segmented, TextButton, TextField } from './kit';
+import { ErrorNotice, Eyebrow, PasswordField, PrimaryButton, Segmented, TextButton, TextField } from './kit';
 import s from './screens.module.css';
 
 type Mode = 'sign-in' | 'sign-up';
@@ -28,11 +28,17 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorView | null>(null);
 
+  const signingUp = mode === 'sign-up';
+  const mismatch = signingUp ? confirmationError(password, confirmation) : null;
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    // Le compte n'est créé que si les deux saisies concordent.
+    if (signingUp && (mismatch || confirmation !== password)) return;
     setError(null);
     setBusy(true);
     try {
@@ -60,8 +66,6 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const signingUp = mode === 'sign-up';
-
   return (
     <div className={s.screen}>
       <form className={s.scroll} onSubmit={(e) => void submit(e)}>
@@ -78,7 +82,7 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
             label="Connexion ou inscription"
             options={MODES}
             value={mode}
-            onChange={(next) => { setMode(next); setError(null); }}
+            onChange={(next) => { setMode(next); setError(null); setConfirmation(''); }}
             disabled={busy}
           />
           <TextField
@@ -93,9 +97,8 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
             onChange={(e) => setEmail(e.target.value)}
             disabled={busy}
           />
-          <TextField
+          <PasswordField
             label="Mot de passe"
-            type="password"
             name="password"
             autoComplete={signingUp ? 'new-password' : 'current-password'}
             required
@@ -105,13 +108,25 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
             onChange={(e) => setPassword(e.target.value)}
             disabled={busy}
           />
+          {signingUp && (
+            <PasswordField
+              label="Confirmer le mot de passe"
+              name="password-confirmation"
+              autoComplete="new-password"
+              required
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
+              error={mismatch}
+              disabled={busy}
+            />
+          )}
 
           {error && <ErrorNotice error={error} onDismiss={() => setError(null)} />}
 
           <PrimaryButton
             type="submit"
             label={busy ? 'Un instant…' : signingUp ? 'Créer mon compte' : 'Se connecter'}
-            disabled={busy || !email || !password}
+            disabled={busy || !email || !password || (signingUp && (!confirmation || !!mismatch))}
           />
           <TextButton label="Continuer sans compte" onClick={onDone} disabled={busy} />
         </div>

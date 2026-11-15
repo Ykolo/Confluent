@@ -17,8 +17,8 @@ import s from './screens.module.css';
 type Slot = 'a' | 'b';
 
 const STRATEGIES = [
-  { value: 'keep-both', label: 'Tout garder' },
   { value: 'newest', label: 'Version récente' },
+  { value: 'keep-both', label: 'Tout garder' },
 ] as const satisfies readonly { value: ConflictStrategy; label: string }[];
 
 /** Ce que le compte sait d'un emplacement, affiché sous sa carte. */

@@ -14,11 +14,16 @@
  * objets, ce que ferait le PUT du client sur l'URL signée. Les comptes de test
  * sont supprimés à la fin, par la route de Better Auth.
  */
-import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, mock, setDefaultTimeout, test } from 'bun:test';
 
 import { MAX_UPLOAD_BYTES } from '@core/cloud/types';
 
 const enabled = !!process.env.ROUTE_TESTS;
+
+// Chaque test enchaîne une dizaine d'allers-retours vers Neon (Francfort),
+// depuis un runner GitHub souvent aux États-Unis : les 5 s par défaut de Bun
+// ne suffisent pas, et un test coupé en plein vol fausse le suivant.
+if (enabled) setDefaultTimeout(30_000);
 
 // --- R2 en mémoire ----------------------------------------------------------
 

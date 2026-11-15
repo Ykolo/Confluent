@@ -47,7 +47,7 @@ nom du fichier produit.
 | `src/backup-info.ts` | Lecture d'une sauvegarde choisie : compteurs des cartes fichier |
 | `src/history.ts` | Historique des fusions, en `AsyncStorage` ; fichiers produits dans les documents de l’app |
 | `src/theme.ts` | Les jetons du canvas de design : couleurs, rayons, fontes |
-| `src/ui/` | Les trois écrans, la connexion, la suppression du compte, et leurs briques |
+| `src/ui/` | Les trois écrans, la connexion, « Mon compte », et leurs briques (icônes Lucide) |
 | `src/cloud/` | Client de l'API de synchronisation, partagé par l'app et le site : types échangés (DTO) et `createCloudClient`, sans dépendance de plateforme |
 | `src/auth-client.ts` | Client Better Auth de l'app : session dans le trousseau (`expo-secure-store`), adresse du serveur (`EXPO_PUBLIC_API_URL`) |
 | `src/auth-errors.ts` | Erreurs de compte traduites en français, partagées avec le site |
@@ -169,8 +169,9 @@ Une sauvegarde déjà présente dans l'emplacement visé (même empreinte) n'est
 pas renvoyée. On peut aussi placer une fusion dans l'emplacement A pour
 préparer la suivante, sans la retélécharger : elle y est copiée côté R2.
 
-**Supprimer son compte.** « Supprimer le compte », dans la barre du compte,
-sur le site et dans l'app, avec le mot de passe pour confirmer. Les fichiers
+**Supprimer son compte.** L'icône de compte, en haut à droite, ouvre « Mon
+compte » (déconnexion, suppression). Le bouton rouge « Supprimer mon compte »,
+tout en bas, ouvre une confirmation qui demande le mot de passe. Les fichiers
 du compte sont effacés de R2 **avant** le compte : si R2 ne répond pas, le
 compte est conservé et la suppression peut être retentée, plutôt que de
 laisser des fichiers sans propriétaire. Les fichiers déjà enregistrés sur les

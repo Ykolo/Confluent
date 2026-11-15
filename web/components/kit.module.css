@@ -271,3 +271,82 @@
   line-height: 17px;
   color: var(--fainter);
 }
+
+/* Fond rouge plein : le bouton qui ouvre la confirmation de suppression du compte. */
+.dangerSolid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--onAccent);
+}
+.dangerSolid:not(:disabled):hover,
+.dangerSolid:not(:disabled):active { background: var(--danger); filter: brightness(0.92); }
+
+/* --- Bouton icône, avec infobulle au survol et au focus clavier --- */
+
+.iconButton {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--muted);
+  transition: background-color 120ms, color 120ms;
+}
+.iconButton:not(:disabled):hover { background: var(--border); color: var(--inkSoft); }
+.iconButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.iconButton:disabled { opacity: 0.5; }
+.icon_accent { color: var(--accent); }
+.icon_danger:not(:disabled):hover { color: var(--danger); background: var(--dangerSurface); }
+
+.iconButton[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 10;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--card);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 120ms 300ms;
+}
+.iconButton[data-tip]:hover::after,
+.iconButton[data-tip]:focus-visible::after { opacity: 1; }
+
+/* --- Champ mot de passe : œil dans le champ, erreur dessous --- */
+
+.passwordWrap {
+  position: relative;
+  display: block;
+}
+.passwordInput { padding-right: 48px; }
+.input[aria-invalid='true'] { border-color: var(--danger); }
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+.reveal:not(:disabled):hover { color: var(--inkSoft); background: var(--border); }
+.reveal:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fieldError {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--danger);
+}

@@ -10,6 +10,7 @@
  */
 'use client';
 
+import { CircleUser } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { inspectBackup, type BackupInfo } from '@core/backup-info';
@@ -26,10 +27,10 @@ import { addToHistory, loadFile, loadHistory, storedFiles, storeFile, type Histo
 import { sha256Web, wasmHost } from '@/lib/sqlite-wasm';
 
 import { AccountScreen } from './AccountScreen';
-import { DeleteAccountScreen } from './DeleteAccountScreen';
+import { MyAccountScreen } from './MyAccountScreen';
 import { HistoryScreen } from './HistoryScreen';
 import { HomeScreen, type CloudLine } from './HomeScreen';
-import { Segmented } from './kit';
+import { IconButton, Segmented } from './kit';
 import s from './screens.module.css';
 import { SummaryScreen, type CloudSave } from './SummaryScreen';
 
@@ -102,30 +103,27 @@ function canShareFiles(file: File): boolean {
 
 /**
  * Le compte, en une ligne discrète au-dessus de l'écran : il reste facultatif.
+ * Connecté, une seule icône mène à « Mon compte » (déconnexion, suppression).
  * Rien ne s'affiche tant que la session n'est pas connue, pour ne pas faire
  * clignoter « Se connecter » chez quelqu'un qui l'est déjà.
  */
-function AccountBar({ email, pending, disabled, onSignIn, onSignOut, onDelete }: {
-  email: string | null;
+function AccountBar({ signedIn, pending, disabled, onSignIn, onOpenAccount }: {
+  signedIn: boolean;
   pending: boolean;
   disabled: boolean;
   onSignIn: () => void;
-  onSignOut: () => void;
-  onDelete: () => void;
+  onOpenAccount: () => void;
 }) {
   if (pending) return <div className={s.account} />;
   return (
     <div className={s.account}>
-      {email ? (
-        <>
-          <span className={s.accountEmail} title={email}>{email}</span>
-          <span aria-hidden>·</span>
-          <button type="button" className={s.accountLink} onClick={onSignOut} disabled={disabled}>Se déconnecter</button>
-          <span aria-hidden>·</span>
-          <button type="button" className={`${s.accountLink} ${s.accountQuiet}`} onClick={onDelete} disabled={disabled}>
-            Supprimer le compte
-          </button>
-        </>
+      {signedIn ? (
+        <IconButton
+          label="Mon compte"
+          icon={<CircleUser size={22} aria-hidden />}
+          onClick={onOpenAccount}
+          disabled={disabled}
+        />
       ) : (
         <button type="button" className={s.accountLink} onClick={onSignIn} disabled={disabled}>
           Se connecter pour synchroniser
@@ -139,7 +137,7 @@ export function Confluent() {
   const [tab, setTab] = useState<Tab>('merge');
   const [fileA, setFileA] = useState<BackupInfo | null>(null);
   const [fileB, setFileB] = useState<BackupInfo | null>(null);
-  const [strategy, setStrategy] = useState<ConflictStrategy>('keep-both');
+  const [strategy, setStrategy] = useState<ConflictStrategy>('newest');
 
   const [busy, setBusy] = useState(false);
   /** Emplacement en cours de lecture, et phase atteinte, pour l'afficher. */
@@ -162,8 +160,9 @@ export function Confluent() {
 
   const session = useSession();
   /** Écran du compte ouvert par-dessus l'application, s'il y en a un. */
-  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'delete' | null>(null);
+  const [accountScreen, setAccountScreen] = useState<'sign-in' | 'account' | null>(null);
 
+  /** Depuis Mon compte : déconnecte, puis mène à l'écran de connexion. */
   const logout = useCallback(async () => {
     setError(null);
     try {
@@ -171,9 +170,13 @@ export function Confluent() {
       if (failure) {
         const view = describeAuthError(failure);
         setError(logError('déconnexion', new Error(view.technical), view));
+        setAccountScreen(null);
+        return;
       }
+      setAccountScreen('sign-in');
     } catch (err) {
       setError(logError('déconnexion', err, describeAuthError({ message: String(err) })));
+      setAccountScreen(null);
     }
   }, []);
 
@@ -612,21 +615,22 @@ export function Confluent() {
         />
       ) : accountScreen === 'sign-in' ? (
         <AccountScreen onDone={() => setAccountScreen(null)} />
-      ) : accountScreen === 'delete' && session.data ? (
-        <DeleteAccountScreen
+      ) : accountScreen === 'account' && session.data ? (
+        <MyAccountScreen
           email={session.data.user.email}
-          onCancel={() => setAccountScreen(null)}
+          busy={busy}
+          onBack={() => setAccountScreen(null)}
+          onSignOut={() => void logout()}
           onDeleted={() => setAccountScreen(null)}
         />
       ) : (
         <>
           <AccountBar
-            email={session.data?.user.email ?? null}
+            signedIn={!!session.data}
             pending={session.isPending}
             disabled={busy}
             onSignIn={() => { setError(null); setAccountScreen('sign-in'); }}
-            onSignOut={() => void logout()}
-            onDelete={() => { setError(null); setAccountScreen('delete'); }}
+            onOpenAccount={() => { setError(null); setAccountScreen('account'); }}
           />
           <div className={s.content}>
             {tab === 'merge' ? (
