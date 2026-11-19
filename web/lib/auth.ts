@@ -18,8 +18,17 @@ import { after } from 'next/server';
 
 import { prisma } from '@/lib/db';
 import { sendEmail } from '@/lib/email';
-import { existingAccountEmail, OTP_TTL_SECONDS, passwordResetEmail, verificationEmail } from '@/lib/email-templates';
+import {
+  existingAccountEmail, OTP_TTL_SECONDS, passwordChangedEmail, passwordResetEmail, verificationEmail,
+} from '@/lib/email-templates';
+import { takeEmailCodeToken } from '@/lib/limits';
 import { purgeUserFiles } from '@/lib/purge';
+
+/** Les routes qui créent un code, et l'usage sous lequel on les compte. */
+const CODE_ROUTES: Record<string, 'verify' | 'reset'> = {
+  '/email-otp/send-verification-otp': 'verify',
+  '/email-otp/request-password-reset': 'reset',
+};
 
 /**
  * Les e-mails partent après la réponse : une adresse inconnue (aucun envoi)
@@ -85,6 +94,14 @@ export const auth = betterAuth({
     // adresses ont un compte. C'est ce message qui prévient la personne.
     onExistingUserSignUp: async ({ user }) => {
       await sendEmail({ to: user.email, ...existingAccountEmail() });
+    },
+    // Si quelqu'un d'autre a réussi à changer le mot de passe, le titulaire
+    // du compte l'apprend tout de suite. Un échec d'envoi n'annule pas la
+    // réinitialisation : il est seulement journalisé.
+    onPasswordReset: async ({ user }) => {
+      inBackground(sendEmail({ to: user.email, ...passwordChangedEmail() }).catch((err: unknown) => {
+        console.error('[e-mail] avis de changement de mot de passe non envoyé', err);
+      }));
     },
   },
   emailVerification: {
@@ -165,6 +182,20 @@ export const auth = betterAuth({
         || ctx.path === '/email-otp/change-email'
         || (ctx.path === '/email-otp/send-verification-otp' && type !== 'email-verification')) {
         throw new APIError('NOT_FOUND', { code: 'NOT_SUPPORTED', message: 'Cette opération n’est pas proposée.' });
+      }
+
+      // Au plus quelques codes par heure et par adresse, avant que le code ne
+      // soit créé. Même réponse qu'un compte existe ou non.
+      const purpose = CODE_ROUTES[ctx.path];
+      const email = (ctx.body as { email?: unknown } | undefined)?.email;
+      if (purpose && typeof email === 'string' && email.length > 0) {
+        const allowance = await takeEmailCodeToken(purpose, email);
+        if (!allowance.allowed) {
+          throw new APIError('TOO_MANY_REQUESTS', {
+            code: 'TOO_MANY_CODE_REQUESTS',
+            message: 'Trop de codes demandés pour cette adresse.',
+          }, { 'Retry-After': String(allowance.retryAfterSeconds) });
+        }
       }
 
       // Sans mot de passe, Better Auth se contente d'une session de moins d'un

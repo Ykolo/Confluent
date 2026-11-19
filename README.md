@@ -184,7 +184,9 @@ appareils ne sont pas touchés.
 **Codes par e-mail.** À l’inscription, un code à 6 chiffres confirme
 l’adresse : pas de session avant. « Mot de passe oublié ? » envoie un code
 à saisir avec le nouveau mot de passe, qui déconnecte alors tous les
-appareils. Un code vaut 10 minutes et 5 essais. Une demande pour une adresse
+appareils et envoie un e-mail « Ton mot de passe a été modifié ». Un code vaut
+10 minutes et 5 essais ; une adresse reçoit au plus 5 codes par heure pour
+chaque usage, quelle que soit l’adresse IP. Une demande pour une adresse
 inconnue reçoit la même réponse qu’une autre, pour ne pas révéler quelles
 adresses ont un compte.
 

@@ -219,6 +219,11 @@ describe.skipIf(!enabled)('routes de l’API', () => {
     }
     await prisma.rateLimit.deleteMany({ where: { key: { in: [alice, bob].filter(Boolean).map((u) => `upload:${u.id}`) } } });
     await prisma.rateLimit.deleteMany({ where: { key: { startsWith: TEST_NET } } });
+    // Les compteurs de codes par adresse (`takeEmailCodeToken`), sous l'empreinte de l'adresse.
+    const { createHash } = await import('node:crypto');
+    const digests = [...extraEmails, ...[alice, bob].filter(Boolean).map((u) => u.email)]
+      .map((e) => createHash('sha256').update(e.toLowerCase()).digest('hex').slice(0, 32));
+    await prisma.rateLimit.deleteMany({ where: { key: { in: digests.flatMap((d) => [`otp:verify:${d}`, `otp:reset:${d}`]) } } });
   });
 
   test('sans session : 401', async () => {
@@ -383,10 +388,29 @@ describe.skipIf(!enabled)('routes de l’API', () => {
     expect((await authCall('/sign-in/email', { email: user.email, password: fresh })).status).toBe(200);
     // Le code ne sert qu'une fois.
     expect((await authCall('/email-otp/reset-password', { email: user.email, otp: code, password: crypto.randomUUID() })).status).not.toBe(200);
+    // Le titulaire est prévenu du changement.
+    for (let i = 0; i < 100 && !inbox.get(user.email)!.some((m) => m.subject.includes('a été modifié')); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(inbox.get(user.email)!.some((m) => m.subject.includes('a été modifié'))).toBe(true);
+  });
+
+  test('codes demandés : 5 par heure et par adresse, quelle que soit l’IP', async () => {
+    const email = testEmail('limite');
+    extraEmails.push(email);
+    // Chaque appel part d'une IP différente (`authCall`) : seule la limite par adresse joue.
+    for (let i = 0; i < 5; i++) {
+      expect((await authCall('/email-otp/request-password-reset', { email })).status).toBe(200);
+    }
+    const refused = await authCall('/email-otp/request-password-reset', { email: email.toUpperCase() });
+    expect(refused).toMatchObject({ status: 429, body: { code: 'TOO_MANY_CODE_REQUESTS' } });
+    // La confirmation d'adresse a son propre compteur.
+    expect((await authCall('/email-otp/send-verification-otp', { email, type: 'email-verification' })).status).toBe(200);
   });
 
   test('mot de passe oublié sur une adresse inconnue : même réponse, aucun e-mail', async () => {
     const email = testEmail('inconnu');
+    extraEmails.push(email);
     const res = await authCall('/email-otp/request-password-reset', { email });
     expect(res).toMatchObject({ status: 200, body: { success: true } });
     await new Promise((r) => setTimeout(r, 500));

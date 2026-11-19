@@ -99,6 +99,21 @@ export function passwordResetEmail(otp: string): EmailContent {
 }
 
 /**
+ * Envoyé après une réinitialisation réussie : si ce n'était pas la personne,
+ * elle l'apprend tout de suite et peut reprendre la main.
+ */
+export function passwordChangedEmail(): EmailContent {
+  const title = 'Ton mot de passe a été modifié';
+  const body = 'Le mot de passe de ton compte Tserohr vient d’être changé, et tous tes appareils ont été déconnectés. Si c’est toi, tu n’as rien à faire.';
+  const warning = 'Si ce n’est pas toi, choisis tout de suite « Mot de passe oublié ? » dans Tserohr avec cette adresse : tu recevras un code pour en définir un nouveau.';
+  return {
+    subject: 'Ton mot de passe Tserohr a été modifié',
+    html: layout(title, [paragraph(body), footnote(warning)].join('\n')),
+    text: [title, '', body, '', warning].join('\n'),
+  };
+}
+
+/**
  * Envoyé à la place du code quand on s'inscrit avec une adresse déjà prise.
  * Le serveur répond comme pour une inscription réussie, pour ne pas révéler
  * quelles adresses ont un compte : c'est ce message qui prévient la personne.
