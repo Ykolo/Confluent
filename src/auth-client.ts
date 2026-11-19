@@ -7,6 +7,7 @@
  * appels de synchronisation.
  */
 import { expoClient } from '@better-auth/expo/client';
+import { emailOTPClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 import * as SecureStore from 'expo-secure-store';
 
@@ -26,10 +27,12 @@ export const authClient = createAuthClient({
       storagePrefix: 'tserohr',
       storage: SecureStore,
     }),
+    // Codes de confirmation d'adresse et de réinitialisation du mot de passe.
+    emailOTPClient(),
   ],
 });
 
-export const { useSession, signIn, signUp, signOut, deleteUser } = authClient;
+export const { useSession, signIn, signUp, signOut, deleteUser, emailOtp } = authClient;
 
 /** En-têtes de session pour les appels à l'API de synchronisation (`createCloudClient`). */
 export async function cloudHeaders(): Promise<Record<string, string>> {

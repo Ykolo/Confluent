@@ -1,134 +1,178 @@
 /**
- * Connexion et inscription, par e-mail et mot de passe.
+ * Connexion et inscription par e-mail et mot de passe, confirmation de
+ * l'adresse par un code reçu par e-mail, et mot de passe oublié.
  *
  * Le compte reste facultatif : la fusion marche sans, il ne sert qu'à
  * retrouver ses sauvegardes et ses fusions d'un appareil à l'autre. On arrive
  * ici depuis « Se connecter pour synchroniser », et on en repart à tout moment.
+ *
+ * Le déroulé (étapes, appels, renvoi du code) est celui de l'app :
+ * `useAccountFlow`, dans `src/account-flow.ts`.
  */
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import type { FormEvent } from 'react';
 
-import { logError, type ErrorView } from '@core/errors';
+import { codeSentLead, resendLabel, useAccountFlow, type AccountClient, type AccountStep } from '@core/account-flow';
+import { MIN_PASSWORD } from '@core/auth-errors';
 
-import { signIn, signUp } from '@/lib/auth-client';
-import { confirmationError, describeAuthError, MIN_PASSWORD } from '@core/auth-errors';
+import { emailOtp, signIn, signUp } from '@/lib/auth-client';
 
-import { ErrorNotice, Eyebrow, PasswordField, PrimaryButton, Segmented, TextButton, TextField } from './kit';
+import { ErrorNotice, Eyebrow, OtpField, PasswordField, PrimaryButton, Segmented, TextButton, TextField } from './kit';
 import s from './screens.module.css';
-
-type Mode = 'sign-in' | 'sign-up';
 
 const MODES = [
   { value: 'sign-in', label: 'Se connecter' },
   { value: 'sign-up', label: 'Créer un compte' },
 ] as const;
 
+const client: AccountClient = {
+  signIn: (body) => signIn.email(body),
+  signUp: (body) => signUp.email(body),
+  verifyEmail: (body) => emailOtp.verifyEmail(body),
+  sendVerificationOtp: ({ email }) => emailOtp.sendVerificationOtp({ email, type: 'email-verification' }),
+  requestPasswordReset: (body) => emailOtp.requestPasswordReset(body),
+  resetPassword: (body) => emailOtp.resetPassword(body),
+};
+
+const TITLES: Record<AccountStep, string> = {
+  'sign-in': 'Se connecter',
+  'sign-up': 'Créer un compte',
+  verify: 'Confirme ton adresse',
+  'forgot-email': 'Mot de passe oublié',
+  'forgot-reset': 'Nouveau mot de passe',
+};
+
+const ACTIONS: Record<AccountStep, string> = {
+  'sign-in': 'Se connecter',
+  'sign-up': 'Créer mon compte',
+  verify: 'Confirmer',
+  'forgot-email': 'Recevoir un code',
+  'forgot-reset': 'Changer le mot de passe',
+};
+
+const LEAD = 'Pour retrouver tes sauvegardes et tes fusions sur tous tes appareils. La fusion, elle, marche sans compte.';
+
 export function AccountScreen({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<Mode>('sign-in');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmation, setConfirmation] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ErrorView | null>(null);
+  const flow = useAccountFlow(client, onDone);
+  const { step, busy } = flow;
+  const entering = step === 'sign-in' || step === 'sign-up';
+  const codeStep = step === 'verify' || step === 'forgot-reset';
 
-  const signingUp = mode === 'sign-up';
-  const mismatch = signingUp ? confirmationError(password, confirmation) : null;
-
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
-    // Le compte n'est créé que si les deux saisies concordent.
-    if (signingUp && (mismatch || confirmation !== password)) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const { error: failure } = mode === 'sign-in'
-        ? await signIn.email({ email, password })
-        : await signUp.email({
-          email,
-          password,
-          // Better Auth exige un nom ; on ne le demande pas pour garder le
-          // formulaire court, la partie locale de l'adresse en tient lieu.
-          name: email.split('@')[0] || email,
-        });
-      if (failure) {
-        const view = describeAuthError(failure);
-        setError(logError(mode === 'sign-in' ? 'connexion' : 'inscription', new Error(view.technical), view));
-        return;
-      }
-      onDone();
-    } catch (err) {
-      // Serveur injoignable : le client Better Auth rejette sans statut.
-      const view = describeAuthError({ message: err instanceof Error ? err.message : String(err) });
-      setError(logError('compte', err, view));
-    } finally {
-      setBusy(false);
-    }
+    void flow.submit();
   };
+
+  const lead = codeStep
+    ? codeSentLead(step, flow.email)
+    : step === 'forgot-email'
+      ? 'Saisis l’adresse de ton compte : tu y recevras un code pour choisir un nouveau mot de passe.'
+      : LEAD;
 
   return (
     <div className={s.screen}>
-      <form className={s.scroll} onSubmit={(e) => void submit(e)}>
+      <form className={s.scroll} onSubmit={submit}>
         <header className={s.header}>
           <Eyebrow>Compte Tserohr</Eyebrow>
-          <h1 className={s.title}>{signingUp ? 'Créer un compte' : 'Se connecter'}</h1>
-          <p className={s.lead}>
-            Pour retrouver tes sauvegardes et tes fusions sur tous tes appareils. La fusion, elle, marche sans compte.
-          </p>
+          <h1 className={s.title}>{TITLES[step]}</h1>
+          <p className={s.lead}>{lead}</p>
         </header>
 
         <div className={s.authForm}>
-          <Segmented
-            label="Connexion ou inscription"
-            options={MODES}
-            value={mode}
-            onChange={(next) => { setMode(next); setError(null); setConfirmation(''); }}
-            disabled={busy}
-          />
-          <TextField
-            label="Adresse e-mail"
-            type="email"
-            name="email"
-            autoComplete="email"
-            inputMode="email"
-            required
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={busy}
-          />
-          <PasswordField
-            label="Mot de passe"
-            name="password"
-            autoComplete={signingUp ? 'new-password' : 'current-password'}
-            required
-            minLength={signingUp ? MIN_PASSWORD : undefined}
-            hint={signingUp ? `${MIN_PASSWORD} caractères au moins.` : undefined}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={busy}
-          />
-          {signingUp && (
-            <PasswordField
-              label="Confirmer le mot de passe"
-              name="password-confirmation"
-              autoComplete="new-password"
-              required
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
-              error={mismatch}
+          {entering && (
+            <Segmented
+              label="Connexion ou inscription"
+              options={MODES}
+              value={step}
+              onChange={flow.go}
               disabled={busy}
             />
           )}
 
-          {error && <ErrorNotice error={error} onDismiss={() => setError(null)} />}
+          {(entering || step === 'forgot-email') && (
+            <TextField
+              label="Adresse e-mail"
+              type="email"
+              name="email"
+              autoComplete="email"
+              inputMode="email"
+              required
+              autoFocus
+              value={flow.email}
+              onChange={(e) => flow.setEmail(e.target.value)}
+              disabled={busy}
+            />
+          )}
 
-          <PrimaryButton
-            type="submit"
-            label={busy ? 'Un instant…' : signingUp ? 'Créer mon compte' : 'Se connecter'}
-            disabled={busy || !email || !password || (signingUp && (!confirmation || !!mismatch))}
-          />
-          <TextButton label="Continuer sans compte" onClick={onDone} disabled={busy} />
+          {codeStep && (
+            <OtpField
+              key={step}
+              label="Code reçu par e-mail"
+              value={flow.otp}
+              onChange={flow.setOtp}
+              disabled={busy}
+              autoFocus
+            />
+          )}
+
+          {step === 'sign-in' && (
+            <>
+              <PasswordField
+                label="Mot de passe"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={flow.password}
+                onChange={(e) => flow.setPassword(e.target.value)}
+                disabled={busy}
+              />
+              <TextButton label="Mot de passe oublié ?" align="end" onClick={() => flow.go('forgot-email')} disabled={busy} />
+            </>
+          )}
+
+          {(step === 'sign-up' || step === 'forgot-reset') && (
+            <>
+              <PasswordField
+                label={step === 'sign-up' ? 'Mot de passe' : 'Nouveau mot de passe'}
+                name="password"
+                autoComplete="new-password"
+                required
+                minLength={MIN_PASSWORD}
+                hint={`${MIN_PASSWORD} caractères au moins.`}
+                value={flow.password}
+                onChange={(e) => flow.setPassword(e.target.value)}
+                disabled={busy}
+              />
+              <PasswordField
+                label="Confirmer le mot de passe"
+                name="password-confirmation"
+                autoComplete="new-password"
+                required
+                value={flow.confirmation}
+                onChange={(e) => flow.setConfirmation(e.target.value)}
+                error={flow.mismatch}
+                disabled={busy}
+              />
+            </>
+          )}
+
+          {flow.error && <ErrorNotice error={flow.error} onDismiss={flow.dismissError} />}
+
+          <PrimaryButton type="submit" label={busy ? 'Un instant…' : ACTIONS[step]} disabled={busy || !flow.ready} />
+
+          {codeStep && (
+            <TextButton
+              label={resendLabel(flow.resendRemaining)}
+              onClick={() => void flow.resend()}
+              disabled={busy || flow.resendRemaining > 0}
+            />
+          )}
+          {step === 'verify' && <TextButton label="Changer d’adresse" onClick={flow.leaveVerify} disabled={busy} />}
+          {(step === 'forgot-email' || step === 'forgot-reset') && (
+            <TextButton label="Retour à la connexion" onClick={() => flow.go('sign-in')} disabled={busy} />
+          )}
+          {entering && <TextButton label="Continuer sans compte" onClick={onDone} disabled={busy} />}
         </div>
       </form>
     </div>

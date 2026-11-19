@@ -4,8 +4,12 @@
  */
 'use client';
 
+import { emailOTPClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 
-export const authClient = createAuthClient();
+export const authClient = createAuthClient({
+  // Codes de confirmation d'adresse et de réinitialisation du mot de passe.
+  plugins: [emailOTPClient()],
+});
 
-export const { useSession, signIn, signUp, signOut, deleteUser } = authClient;
+export const { useSession, signIn, signUp, signOut, deleteUser, emailOtp } = authClient;

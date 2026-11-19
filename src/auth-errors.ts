@@ -58,6 +58,27 @@ const VIEWS: Record<string, Omit<ErrorView, 'technical'>> = {
     message: 'Le mot de passe dépasse la longueur autorisée.',
     hint: 'Choisis-en un plus court.',
   },
+  // Codes reçus par e-mail : confirmation de l'adresse, réinitialisation.
+  EMAIL_NOT_VERIFIED: {
+    title: 'Adresse à confirmer',
+    message: 'Ce compte n’est pas encore confirmé.',
+    hint: 'Saisis le code reçu par e-mail.',
+  },
+  INVALID_OTP: {
+    title: 'Code incorrect',
+    message: 'Ce code ne correspond pas.',
+    hint: 'Vérifie le dernier e-mail reçu, ou demande un nouveau code.',
+  },
+  OTP_EXPIRED: {
+    title: 'Code expiré',
+    message: 'Ce code n’est plus valable.',
+    hint: 'Demande un nouveau code.',
+  },
+  TOO_MANY_ATTEMPTS: {
+    title: 'Trop d’essais',
+    message: 'Ce code a été saisi trop de fois sans succès.',
+    hint: 'Demande un nouveau code.',
+  },
   // Suppression du compte.
   INVALID_PASSWORD: {
     title: 'Mot de passe incorrect',

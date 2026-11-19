@@ -50,6 +50,7 @@ nom du fichier produit.
 | `src/ui/` | Les trois écrans, la connexion, « Mon compte », et leurs briques (icônes Lucide) |
 | `src/cloud/` | Client de l'API de synchronisation, partagé par l'app et le site : types échangés (DTO) et `createCloudClient`, sans dépendance de plateforme |
 | `src/auth-client.ts` | Client Better Auth de l'app : session dans le trousseau (`expo-secure-store`), adresse du serveur (`EXPO_PUBLIC_API_URL`) |
+| `src/account-flow.ts` | Les étapes de l'écran de compte, communes à l'app et au site : connexion, inscription, code reçu par e-mail, mot de passe oublié |
 | `src/auth-errors.ts` | Erreurs de compte traduites en français, partagées avec le site |
 | `src/platform/cloud-expo.ts` | Le client de synchronisation de l'app, sur `expo/fetch` |
 
@@ -74,7 +75,8 @@ sortie forcé.
 
 Les variables d'environnement sont décrites, sans valeur, dans
 [`web/.env.example`](web/.env.example) : base Neon, secret Better Auth,
-bucket R2 et secret du Cron. Les copier dans `web/.env.local` et les remplir
+bucket R2, clé Resend et secret du Cron. Sans clé Resend, les codes envoyés
+par e-mail s’affichent dans la console du serveur. Les copier dans `web/.env.local` et les remplir
 (branche Neon `dev`), puis, depuis `web/` :
 
     bunx prisma migrate dev   # met la branche dev au niveau du schéma
@@ -104,7 +106,8 @@ le site lancé par `bun run dev -H 0.0.0.0` (l'option va à `next dev`).
 | `web/scripts/copy-sqlite.ts` | Pose SQLite WebAssembly dans `public/sqlite/` avant `dev` et `build` |
 | `web/prisma/schema.prisma` | Comptes (Better Auth), sauvegardes déposées et fusions : métadonnées seulement, les fichiers vivent dans R2 |
 | `web/lib/db.ts` | Client Prisma du serveur, sur l'adaptateur Neon (URL poolée) |
-| `web/lib/auth.ts` | Comptes (Better Auth) : e-mail et mot de passe, plugin Expo pour l'app, suppression du compte, `requireUser()` pour les routes |
+| `web/lib/auth.ts` | Comptes (Better Auth) : e-mail et mot de passe, adresse confirmée par un code, mot de passe oublié, plugin Expo pour l'app, suppression du compte, `requireUser()` pour les routes |
+| `web/lib/email.ts`, `web/lib/email-templates.ts` | E-mails de compte envoyés par Resend (`mail.tserohr.com`) : codes de confirmation et de réinitialisation |
 | `web/lib/r2.ts` | Fichiers dans Cloudflare R2 : clés, URL présignées d'envoi et de téléchargement, vérification, copie, suppression |
 | `web/lib/api.ts` | Ce que partagent les routes : erreurs, validation des corps (Zod), passage des lignes aux DTO |
 | `web/lib/limits.ts` | Quota de 30 fusions par compte, limite de 20 envois par heure |
@@ -155,7 +158,8 @@ favoris).
 **Ce qui ne l'est jamais.** Le serveur n'ouvre pas les sauvegardes : aucune
 lecture, aucune fusion côté serveur. La fusion se fait toujours sur
 l'appareil, dans l'app ou dans le navigateur, avec le même moteur
-(`src/merge.ts`). Le mot de passe est haché par Better Auth.
+(`src/merge.ts`). Le mot de passe est haché par Better Auth ; les codes
+envoyés par e-mail ne sont gardés en base que sous forme d’empreinte.
 
 **Combien de temps.**
 
@@ -176,6 +180,13 @@ du compte sont effacés de R2 **avant** le compte : si R2 ne répond pas, le
 compte est conservé et la suppression peut être retentée, plutôt que de
 laisser des fichiers sans propriétaire. Les fichiers déjà enregistrés sur les
 appareils ne sont pas touchés.
+
+**Codes par e-mail.** À l’inscription, un code à 6 chiffres confirme
+l’adresse : pas de session avant. « Mot de passe oublié ? » envoie un code
+à saisir avec le nouveau mot de passe, qui déconnecte alors tous les
+appareils. Un code vaut 10 minutes et 5 essais. Une demande pour une adresse
+inconnue reçoit la même réponse qu’une autre, pour ne pas révéler quelles
+adresses ont un compte.
 
 **Limites.** 20 envois par heure et par compte, des tentatives de connexion
 limitées par Better Auth, des fichiers de 200 Mo au plus.

@@ -213,6 +213,32 @@ export function PasswordField({ label, hint, error, ...input }: { label: string;
   );
 }
 
+/**
+ * Champ du code reçu par e-mail. iOS le propose au-dessus du clavier depuis
+ * Mail (`oneTimeCode`), Android depuis la notification (`one-time-code`). Un
+ * code collé avec des espaces est nettoyé par `onChangeText` (`normalizeOtp`).
+ */
+export function OtpField({ label, ...input }: { label: string }
+  & Pick<TextInputProps, 'value' | 'onChangeText' | 'editable' | 'onSubmitEditing' | 'autoFocus'>) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        {...input}
+        keyboardType="number-pad"
+        textContentType="oneTimeCode"
+        autoComplete="one-time-code"
+        returnKeyType="go"
+        accessibilityLabel={label}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[styles.input, styles.otpInput, focused && styles.inputFocused, input.editable === false && styles.disabled]}
+      />
+    </View>
+  );
+}
+
 /** Séparateur « — + — » entre les deux fichiers. */
 export function PlusRule() {
   return (
@@ -365,6 +391,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   inputFocused: { borderColor: color.accent },
+  // Le code à 6 chiffres : gros, espacé, centré.
+  otpInput: { fontFamily: font.sansSemi, fontSize: 24, letterSpacing: 8, textAlign: 'center', paddingVertical: 12 },
   fieldHint: { fontFamily: font.sans, fontSize: 12, lineHeight: 17, color: color.fainter },
 
   primary: {
