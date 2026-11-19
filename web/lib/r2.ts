@@ -71,17 +71,53 @@ function encodeRfc5987(value: string): string {
 
 let cached: { client: S3Client; bucket: string } | null = null;
 
+export interface R2Config {
+  account: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+}
+
+/**
+ * Une valeur collée telle qu'elle apparaît dans un `.env` : espaces et retour
+ * à la ligne autour, guillemets compris. Le chargeur de `.env` les retire en
+ * local, mais pas Vercel : `"abc…"` y devient l'hôte `"abc…".r2…`, et chaque
+ * appel échoue en pleine poignée de main TLS, sans dire pourquoi.
+ */
+function clean(value: string | undefined): string {
+  const v = (value ?? '').trim();
+  return /^(["']).*\1$/.test(v) ? v.slice(1, -1).trim() : v;
+}
+
+/**
+ * Les variables R2, nettoyées et vérifiées. Lève une erreur qui nomme la
+ * variable fautive plutôt que de laisser le SDK échouer plus loin.
+ */
+export function readR2Config(env: Record<string, string | undefined>): R2Config {
+  const config = {
+    account: clean(env.R2_ACCOUNT_ID),
+    accessKeyId: clean(env.R2_ACCESS_KEY_ID),
+    secretAccessKey: clean(env.R2_SECRET_ACCESS_KEY),
+    bucket: clean(env.R2_BUCKET),
+  };
+  if (!config.account || !config.accessKeyId || !config.secretAccessKey || !config.bucket) {
+    throw new Error('r2 : R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY et R2_BUCKET sont requis (voir web/.env.example)');
+  }
+  // L'identifiant de compte Cloudflare : 32 caractères hexadécimaux. Il forme
+  // le nom d'hôte du point d'accès ; mal formé, l'erreur serait illisible.
+  if (!/^[0-9a-f]{32}$/i.test(config.account)) {
+    throw new Error(`r2 : R2_ACCOUNT_ID mal formé (${config.account.length} caractères) — attendu l'identifiant de compte Cloudflare, 32 caractères hexadécimaux`);
+  }
+  return config;
+}
+
 /**
  * Client créé au premier appel, pas à l'import : `next build` charge les
  * modules des routes sans les variables d'environnement.
  */
 function r2() {
   if (cached) return cached;
-  const { R2_ACCOUNT_ID: account, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey, R2_BUCKET: bucket } =
-    process.env;
-  if (!account || !accessKeyId || !secretAccessKey || !bucket) {
-    throw new Error('r2 : R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY et R2_BUCKET sont requis (voir web/.env.example)');
-  }
+  const { account, accessKeyId, secretAccessKey, bucket } = readR2Config(process.env);
   const client = new S3Client({
     region: 'auto',
     endpoint: `https://${account}.r2.cloudflarestorage.com`,
