@@ -19,5 +19,8 @@ docs/
 web/*
 !web/package.json
 !web/prisma.config.ts
-!web/prisma/
-web/prisma/migrations/
+# Sans barre finale : EAS teste le dossier comme un chemin simple, et
+# `!web/prisma/` ne le réinclut pas (le schéma restait dehors).
+!web/prisma
+web/prisma/*
+!web/prisma/schema.prisma
