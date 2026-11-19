@@ -137,9 +137,43 @@ export function DashedButton({ label, onClick, disabled }: ButtonProps) {
   return <button type="button" className={s.dashed} onClick={onClick} disabled={disabled}>{label}</button>;
 }
 
-/** Lien souligné : « Terminer sans enregistrer ». */
-export function TextButton({ label, onClick, disabled }: ButtonProps) {
-  return <button type="button" className={s.text} onClick={onClick} disabled={disabled}>{label}</button>;
+/** Lien souligné : « Terminer sans enregistrer ». `end` l'aligne à droite, sous un champ. */
+export function TextButton({ label, onClick, disabled, align = 'center' }: ButtonProps & { align?: 'center' | 'end' }) {
+  return (
+    <button type="button" className={align === 'end' ? `${s.text} ${s.textEnd}` : s.text} onClick={onClick} disabled={disabled}>
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Champ du code reçu par e-mail. `autoComplete="one-time-code"` laisse Safari
+ * le proposer depuis Mail ; un code collé avec des espaces est nettoyé par
+ * `onChange` (voir `normalizeOtp`).
+ */
+export function OtpField({ label, value, onChange, disabled, autoFocus }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  autoFocus?: boolean;
+}) {
+  return (
+    <label className={s.field}>
+      <span className={s.fieldLabel}>{label}</span>
+      <input
+        className={`${s.input} ${s.otpInput}`}
+        name="one-time-code"
+        autoComplete="one-time-code"
+        inputMode="numeric"
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        autoFocus={autoFocus}
+      />
+    </label>
+  );
 }
 
 /** Séparateur « — + — » entre les deux fichiers. */

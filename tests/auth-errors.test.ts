@@ -35,6 +35,13 @@ describe('describeAuthError', () => {
     expect(describeAuthError(null).title).toBe('Pas de connexion');
   });
 
+  test('codes reçus par e-mail : faux, expiré, trop d’essais, compte non confirmé', () => {
+    expect(describeAuthError({ code: 'INVALID_OTP', status: 400 }).title).toBe('Code incorrect');
+    expect(describeAuthError({ code: 'OTP_EXPIRED', status: 400 }).hint).toBe('Demande un nouveau code.');
+    expect(describeAuthError({ code: 'TOO_MANY_ATTEMPTS', status: 403 }).title).toBe('Trop d’essais');
+    expect(describeAuthError({ code: 'EMAIL_NOT_VERIFIED', status: 403 }).hint).toBe('Saisis le code reçu par e-mail.');
+  });
+
   test('code inconnu : vue générique', () => {
     const view = describeAuthError({ code: 'SOMETHING_NEW', status: 500 });
     expect(view.title).toBe('Connexion impossible');
