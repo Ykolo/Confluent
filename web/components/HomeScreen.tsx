@@ -190,7 +190,7 @@ export function HomeScreen({
     <div className={s.screen}>
       <div className={s.scroll}>
         <header className={s.header}>
-          <Eyebrow>Confluent</Eyebrow>
+          <Eyebrow>Tserohr</Eyebrow>
           <h1 className={s.titleLarge}>Fusionner deux sauvegardes</h1>
         </header>
 

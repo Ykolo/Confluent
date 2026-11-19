@@ -113,8 +113,8 @@ jobs:
           api_key: ${{ env.NEON_API_KEY }}
           branch_name: ci/run-${{ github.run_id }}-${{ github.run_attempt }}
           parent_branch: dev
-          database: confluent
-          role: confluent_owner
+          database: tserohr
+          role: tserohr_owner
           expires_at: ${{ steps.neon.outputs.expires }}
 
       - name: Migrations

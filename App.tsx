@@ -1,5 +1,5 @@
 /**
- * Confluent — fusion de deux sauvegardes JW Library.
+ * Tserohr — fusion de deux sauvegardes JW Library.
  *
  * Trois écrans, tels que dessinés dans « Fusion Sauvegardes » : l'accueil où
  * l'on choisit les deux fichiers, le récapitulatif de la fusion, et
@@ -120,7 +120,7 @@ function surface(scope: string, err: unknown): ErrorView {
 // rendu : une erreur au démarrage part alors elle aussi dans le terminal.
 installGlobalErrorLogging();
 
-function Confluent() {
+function Tserohr() {
   const [fontsLoaded] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
@@ -933,7 +933,7 @@ function Confluent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <Confluent />
+      <Tserohr />
     </SafeAreaProvider>
   );
 }

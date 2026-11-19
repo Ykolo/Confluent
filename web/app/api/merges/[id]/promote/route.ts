@@ -51,7 +51,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           size: merge.size,
           sha256: merge.sha256,
           name: merge.fileName!,
-          deviceName: merge.sources || 'Fusion Confluent',
+          deviceName: merge.sources || 'Fusion Tserohr',
           backupCreatedAt: merge.createdAt,
           counts: totals ? { notes: totals.notes, highlights: totals.highlights, bookmarks: totals.bookmarks } : undefined,
           uploadedFrom: FROM_MERGE,

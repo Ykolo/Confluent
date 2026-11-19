@@ -1,7 +1,7 @@
 /**
  * Tests sur une sauvegarde iOS et une Android, sans simulateur. Par défaut,
  * les fausses de `fixtures/backups.ts` ; les vraies, en local, avec
- * `CONFLUENT_IPAD` et `CONFLUENT_ANDROID`.
+ * `TSEROHR_IPAD` et `TSEROHR_ANDROID`.
  *
  *     bun test
  *
@@ -220,7 +220,7 @@ describe('stratégie de conflit', () => {
 
 // Garde-fou sur les fausses sauvegardes : si elles cessent de provoquer ces
 // cas, les tests ci-dessus passent encore mais ne vérifient plus grand-chose.
-describe.skipIf(!!process.env.CONFLUENT_IPAD)('fausses sauvegardes', () => {
+describe.skipIf(!!process.env.TSEROHR_IPAD)('fausses sauvegardes', () => {
   test('provoquent conflits, lieux proches et signets déplacés', () => {
     expect(ab.report.noteConflicts).toBe(2);
     // doc201 ne diffère de doc200 que par DocumentId : il doit être ajouté.

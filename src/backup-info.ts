@@ -76,8 +76,8 @@ function checkVersion(manifest: Manifest): void {
   if (version === SUPPORTED_SCHEMA_VERSION) return;
   throw new AppError({
     title: 'Format non pris en charge',
-    message: 'Cette sauvegarde a été produite par une version de JW Library que Confluent ne sait pas encore lire.',
-    hint: 'Mets Confluent à jour ; en attendant, la fusion risquerait de perdre des données.',
+    message: 'Cette sauvegarde a été produite par une version de JW Library que Tserohr ne sait pas encore lire.',
+    hint: 'Mets Tserohr à jour ; en attendant, la fusion risquerait de perdre des données.',
     technical: `schemaVersion ${version}, attendu ${SUPPORTED_SCHEMA_VERSION}`,
   });
 }

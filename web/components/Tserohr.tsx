@@ -1,5 +1,5 @@
 /**
- * Confluent, version web — le pendant de `App.tsx`.
+ * Tserohr, version web — le pendant de `App.tsx`.
  *
  * Mêmes trois écrans, même moteur (`src/merge.ts`), même découpage en
  * tranches pour garder l'écran vivant. Ce qui change est ce que le navigateur
@@ -134,7 +134,7 @@ function AccountBar({ signedIn, pending, disabled, onSignIn, onOpenAccount }: {
   );
 }
 
-export function Confluent() {
+export function Tserohr() {
   const [tab, setTab] = useState<Tab>('merge');
   const [fileA, setFileA] = useState<BackupInfo | null>(null);
   const [fileB, setFileB] = useState<BackupInfo | null>(null);

@@ -16,7 +16,7 @@
  *
  * Pour rejouer les tests sur de vraies sauvegardes, en local :
  *
- *     CONFLUENT_IPAD=chemin.jwlibrary CONFLUENT_ANDROID=chemin.jwlibrary bun test
+ *     TSEROHR_IPAD=chemin.jwlibrary TSEROHR_ANDROID=chemin.jwlibrary bun test
  */
 import { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
@@ -293,7 +293,7 @@ function ipadDatabase(): Uint8Array {
 function androidDatabase(): Record<string, Uint8Array> {
   const side = build(ANDROID);
   const own = (guid: Value) => String(guid).startsWith('bbbbbbbb') || String(guid).startsWith('note-andr');
-  const dir = mkdtempSync(join(tmpdir(), 'confluent-fixture-'));
+  const dir = mkdtempSync(join(tmpdir(), 'tserohr-fixture-'));
   const path = join(dir, 'userData.db');
   try {
     const db = new Database(path);
@@ -338,9 +338,9 @@ function androidDatabase(): Record<string, Uint8Array> {
 let ipad: Uint8Array | undefined;
 let android: Uint8Array | undefined;
 
-/** Sauvegarde iPad : `CONFLUENT_IPAD` si défini, sinon la fausse. */
+/** Sauvegarde iPad : `TSEROHR_IPAD` si défini, sinon la fausse. */
 export function ipadBackup(): Uint8Array {
-  const real = process.env.CONFLUENT_IPAD;
+  const real = process.env.TSEROHR_IPAD;
   if (real) return new Uint8Array(readFileSync(real));
   // Certaines sauvegardes iOS embarquent un hash tronqué : voir `readBackup`.
   ipad ??= archive('iPad', 'UserdataBackup_2026-04-02_iPad.jwlibrary', '2026-04-02T12:00:00+0200',
@@ -348,9 +348,9 @@ export function ipadBackup(): Uint8Array {
   return ipad;
 }
 
-/** Sauvegarde Android : `CONFLUENT_ANDROID` si défini, sinon la fausse. */
+/** Sauvegarde Android : `TSEROHR_ANDROID` si défini, sinon la fausse. */
 export function androidBackup(): Uint8Array {
-  const real = process.env.CONFLUENT_ANDROID;
+  const real = process.env.TSEROHR_ANDROID;
   if (real) return new Uint8Array(readFileSync(real));
   android ??= archive('Samsung_SM-S911B', 'UserdataBackup_2026-05-02_Samsung_SM-S911B.jwlibrary',
     '2026-05-02T10:00:00Z', androidDatabase(), ANDROID.media, (h) => h);

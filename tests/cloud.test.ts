@@ -11,7 +11,7 @@ import { deferred, ReadAborted } from '../src/deferred';
 import { describeKeptSlot, type BackupDto, type MergeDto } from '../src/cloud/types';
 import { describeError } from '../src/errors';
 
-const API = 'https://confluent.test';
+const API = 'https://tserohr.test';
 const R2 = 'https://r2.test';
 const SESSION = 'session=abc';
 

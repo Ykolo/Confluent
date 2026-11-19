@@ -22,7 +22,7 @@ import { createWasmHost, sha256Web } from '../lib/sqlite-wasm';
 // Le site charge le module depuis `public/` ; ici, directement depuis le paquet.
 const wasmHost = createWasmHost(() => import('@sqlite.org/sqlite-wasm').then((m) => m.default()));
 
-const scratch = mkdtempSync(join(tmpdir(), 'confluent-web-'));
+const scratch = mkdtempSync(join(tmpdir(), 'tserohr-web-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 /** Base en mode WAL dont les écritures ne sont *pas* encore dans le fichier principal. */
@@ -104,13 +104,13 @@ describe('hôte WebAssembly', () => {
   });
 
   test('SHA-256 identique à celui de l’app', async () => {
-    const bytes = new TextEncoder().encode('Confluent');
+    const bytes = new TextEncoder().encode('Tserohr');
     expect(await sha256Web(bytes)).toBe(await sha256Bun(bytes));
   });
 });
 
 // Les fausses sauvegardes de `tests/fixtures`, ou les vraies avec
-// `CONFLUENT_IPAD` et `CONFLUENT_ANDROID`.
+// `TSEROHR_IPAD` et `TSEROHR_ANDROID`.
 describe('sur une sauvegarde iPad et une Android', () => {
   test('la fusion donne les mêmes totaux dans le navigateur et sous Bun', async () => {
     const a = ipadBackup();

@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Confluent",
-    "slug": "confluent",
+    "name": "Tserohr",
+    "slug": "tserohr",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "confluent",
+    "scheme": "tserohr",
     "userInterfaceStyle": "light",
     "backgroundColor": "#FBF9F5",
     "icon": "./assets/icon.png",
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.confluent.merge"
+      "bundleIdentifier": "app.tserohr.merge"
     },
     "android": {
-      "package": "app.confluent.merge",
+      "package": "app.tserohr.merge",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "monochromeImage": "./assets/icon-monochrome.png",
@@ -34,8 +34,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "6b1e38f0-1b11-42a0-9d1b-11a608ae307b"
+        "projectId": "38b74cdc-55ab-458e-b5e3-a94eb5288f76"
       }
-    }
+    },
+    "owner": "ykolo"
   }
 }

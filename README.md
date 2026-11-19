@@ -1,4 +1,4 @@
-# Confluent — fusion de sauvegardes JW Library
+# Tserohr — fusion de sauvegardes JW Library
 
 Application Expo et site web qui fusionnent deux fichiers `.jwlibrary` en un
 seul, sans perte. Trois écrans : choisir les deux fichiers, lire le
@@ -20,7 +20,7 @@ Les tests tournent sur deux fausses sauvegardes, iPad et Android, fabriquées
 fait la CI à chaque PR. Pour les rejouer sur de vraies sauvegardes, qui
 restent hors du dépôt :
 
-    CONFLUENT_IPAD=iPad.jwlibrary CONFLUENT_ANDROID=Android.jwlibrary bun test
+    TSEROHR_IPAD=iPad.jwlibrary TSEROHR_ANDROID=Android.jwlibrary bun test
 
 Validé sur de vraies sauvegardes iOS + Android, `schemaVersion` 16.
 
@@ -97,7 +97,7 @@ le site lancé par `bun run dev -H 0.0.0.0` (l'option va à `next dev`).
 
 | Fichier | Rôle |
 |---|---|
-| `web/components/Confluent.tsx` | Le pendant d'`App.tsx` : lecture, fusion, téléchargement, partage |
+| `web/components/Tserohr.tsx` | Le pendant d'`App.tsx` : lecture, fusion, téléchargement, partage |
 | `web/components/` | Les trois écrans et leurs briques, en HTML + CSS Modules |
 | `web/lib/sqlite-wasm.ts` | `SqliteHost` + SHA-256 pour le navigateur |
 | `web/lib/history.ts` | Historique des fusions, en `localStorage` ; fichiers produits en IndexedDB |

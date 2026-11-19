@@ -72,7 +72,7 @@ export interface CloudClient {
 }
 
 export interface CloudClientOptions {
-  /** Adresse du serveur, sans `/` final : `https://confluent-web.vercel.app`. */
+  /** Adresse du serveur, sans `/` final : `https://www.tserohr.com`. */
   baseUrl: string;
   /** Le `fetch` de la plateforme ; seule cette forme d'appel est utilisée. */
   fetch: (url: string, init?: RequestInit) => Promise<Response>;
@@ -125,7 +125,7 @@ function viewFor(status: number): { title: string; message: string; hint?: strin
     return { title: 'Trop de tentatives', message: 'Le serveur demande de patienter un peu.', hint: 'Patiente, puis réessaie.' };
   }
   if (status >= 500) {
-    return { title: 'Serveur indisponible', message: 'Le serveur de Confluent n’a pas pu répondre.', hint: 'Réessaie dans quelques instants.' };
+    return { title: 'Serveur indisponible', message: 'Le serveur de Tserohr n’a pas pu répondre.', hint: 'Réessaie dans quelques instants.' };
   }
   return { title: 'Requête refusée', message: 'Le serveur a refusé la demande.', hint: 'Mets l’app à jour si le problème persiste.' };
 }
@@ -133,7 +133,7 @@ function viewFor(status: number): { title: string; message: string; hint?: strin
 function networkError(what: string, cause: unknown): CloudError {
   return new CloudError(0, 'network', {
     title: 'Pas de connexion',
-    message: 'Le serveur de Confluent n’a pas pu être joint.',
+    message: 'Le serveur de Tserohr n’a pas pu être joint.',
     hint: 'Vérifie ta connexion internet, puis réessaie.',
     technical: `${what} : ${cause instanceof Error ? cause.message : String(cause)}`,
     cause,
