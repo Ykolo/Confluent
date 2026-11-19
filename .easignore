@@ -12,6 +12,12 @@ docs/
 
 # Le site web se construit ailleurs : rien à y faire pour compiler l'app.
 # Sauf son package.json : la racine le déclare comme workspace, et le
-# `bun install` qui suit le prebuild échoue s'il ne le trouve pas.
+# `bun install` qui suit le prebuild échoue s'il ne le trouve pas. Ce même
+# install lance le `postinstall` du workspace (`prisma generate`), qui a
+# besoin de la configuration et du schéma Prisma, mais ni de la base ni des
+# migrations.
 web/*
 !web/package.json
+!web/prisma.config.ts
+!web/prisma/
+web/prisma/migrations/
