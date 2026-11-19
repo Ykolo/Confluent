@@ -15,12 +15,31 @@ let r2: R2;
 
 beforeAll(async () => {
   Object.assign(process.env, {
-    R2_ACCOUNT_ID: 'compte-de-test',
+    // Entre guillemets, comme collé depuis un .env : le module doit les retirer.
+    R2_ACCOUNT_ID: ' "0123456789abcdef0123456789abcdef"\n',
     R2_ACCESS_KEY_ID: 'AKIDTEST',
     R2_SECRET_ACCESS_KEY: 'secret-de-test',
     R2_BUCKET: 'bucket-de-test',
   });
   r2 = await import('../lib/r2');
+});
+
+describe('readR2Config', () => {
+  const base = { R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef', R2_ACCESS_KEY_ID: 'AK', R2_SECRET_ACCESS_KEY: 'SK', R2_BUCKET: 'b' };
+
+  test('retire espaces, retours à la ligne et guillemets autour des valeurs', () => {
+    const config = r2.readR2Config({ ...base, R2_ACCOUNT_ID: ' "0123456789ABCDEF0123456789ABCDEF"\r\n', R2_BUCKET: "'tserohr-backups' " });
+    expect(config.account).toBe('0123456789ABCDEF0123456789ABCDEF');
+    expect(config.bucket).toBe('tserohr-backups');
+  });
+
+  test('identifiant de compte mal formé : erreur qui nomme la variable', () => {
+    expect(() => r2.readR2Config({ ...base, R2_ACCOUNT_ID: 'compte-de-test' })).toThrow('R2_ACCOUNT_ID mal formé');
+  });
+
+  test('variable manquante ou vide après nettoyage', () => {
+    expect(() => r2.readR2Config({ ...base, R2_BUCKET: '""' })).toThrow('sont requis');
+  });
 });
 
 describe('clés', () => {
@@ -61,7 +80,7 @@ describe('attachment', () => {
 describe('URL présignées', () => {
   test('PUT : 10 minutes, taille signée, pas de somme de contrôle imposée', async () => {
     const url = new URL(await r2.presignPut(r2.backupKey('u1', 'b1'), 1234));
-    expect(url.host).toBe('compte-de-test.r2.cloudflarestorage.com');
+    expect(url.host).toBe('0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com');
     expect(url.pathname).toBe('/bucket-de-test/backups/u1/b1.jwlibrary');
     expect(url.searchParams.get('X-Amz-Expires')).toBe('600');
     expect(url.searchParams.get('X-Amz-SignedHeaders')?.split(';')).toContain('content-length');
