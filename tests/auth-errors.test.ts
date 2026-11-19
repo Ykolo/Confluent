@@ -40,6 +40,8 @@ describe('describeAuthError', () => {
     expect(describeAuthError({ code: 'OTP_EXPIRED', status: 400 }).hint).toBe('Demande un nouveau code.');
     expect(describeAuthError({ code: 'TOO_MANY_ATTEMPTS', status: 403 }).title).toBe('Trop d’essais');
     expect(describeAuthError({ code: 'EMAIL_NOT_VERIFIED', status: 403 }).hint).toBe('Saisis le code reçu par e-mail.');
+    // 429 avec un code connu : pas le « patiente une minute » générique.
+    expect(describeAuthError({ code: 'TOO_MANY_CODE_REQUESTS', status: 429 }).hint).toContain('une heure');
   });
 
   test('code inconnu : vue générique', () => {

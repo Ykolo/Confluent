@@ -79,6 +79,11 @@ const VIEWS: Record<string, Omit<ErrorView, 'technical'>> = {
     message: 'Ce code a été saisi trop de fois sans succès.',
     hint: 'Demande un nouveau code.',
   },
+  TOO_MANY_CODE_REQUESTS: {
+    title: 'Trop de codes demandés',
+    message: 'Plusieurs codes ont déjà été envoyés à cette adresse.',
+    hint: 'Utilise le dernier reçu, ou réessaie dans une heure.',
+  },
   // Suppression du compte.
   INVALID_PASSWORD: {
     title: 'Mot de passe incorrect',
