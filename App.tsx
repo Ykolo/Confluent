@@ -1,5 +1,5 @@
 /**
- * Confluent — fusion de deux sauvegardes JW Library.
+ * Tserohr — fusion de deux sauvegardes JW Library.
  *
  * Trois écrans, tels que dessinés dans « Fusion Sauvegardes » : l'accueil où
  * l'on choisit les deux fichiers, le récapitulatif de la fusion, et
@@ -35,7 +35,8 @@ import {
   addToHistory, archivedFile, findArchivedFile, fromMergeDto, loadHistory, pruneArchive, remoteCopy,
   type HistoryEntry,
 } from './src/history';
-import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
+import { deferred, ReadAborted } from './src/deferred';
+import { mergeBackups, readManifest, type Backup, type ConflictStrategy, type MergeReport } from './src/merge';
 import { openInJwLibrary, RESTORE_STEPS } from './src/platform/jw-library';
 import { expoHost, sha256Expo } from './src/platform/sqlite-expo';
 import { overallRatio } from './src/progress';
@@ -119,7 +120,7 @@ function surface(scope: string, err: unknown): ErrorView {
 // rendu : une erreur au démarrage part alors elle aussi dans le terminal.
 installGlobalErrorLogging();
 
-function Confluent() {
+function Tserohr() {
   const [fontsLoaded] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
@@ -223,11 +224,22 @@ function Confluent() {
       const pickNo = ++picks.current[slot];
       setRemote((r) => ({ ...r, [slot]: null }));
       setUploading((u) => ({ ...u, [slot]: false }));
-      const info = await inspectInto(slot, asset.name, bytes, lap);
 
-      // Connecté, et « garder dans le compte » coché : dépôt en tâche de fond.
-      // L'écran est déjà rendu à l'utilisateur, la fusion n'attend pas l'envoi.
-      if (sync.current.userId && sync.current.keep) void keepRemotely(slot, bytes, info, pickNo);
+      // Connecté, et « garder dans le compte » coché : le dépôt part tout de
+      // suite, en même temps que la lecture. L'envoi vers R2 et la
+      // décompression se recouvrent ; seule la confirmation attend les
+      // compteurs. La fusion, elle, n'attend jamais l'envoi.
+      const meta = sync.current.userId && sync.current.keep ? deferred<BackupInfo>() : null;
+      if (meta) void keepRemotely(slot, bytes, meta.promise, pickNo);
+      let info: BackupInfo;
+      try {
+        info = await inspectInto(slot, asset.name, bytes, lap);
+      } catch (err) {
+        meta?.reject(new ReadAborted());
+        throw err;
+      }
+      if (picks.current[slot] === pickNo) meta?.resolve(info);
+      else meta?.reject(new ReadAborted());
     } catch (err) {
       setError(surface(`choix du fichier ${slot.toUpperCase()}`, err));
     } finally {
@@ -332,15 +344,24 @@ function Confluent() {
   const alreadyThere = useRef(new Set<string>());
 
   /** Dépose en tâche de fond la sauvegarde qu'on vient de lire. */
-  const keepRemotely = useCallback(async (slot: Slot, bytes: Uint8Array, info: BackupInfo, pickNo: number) => {
+  const keepRemotely = useCallback(async (slot: Slot, bytes: Uint8Array, info: Promise<BackupInfo>, pickNo: number) => {
     setUploading((u) => ({ ...u, [slot]: true }));
     try {
+      // Un fichier qui n'est pas une sauvegarde ne part pas : la lecture, elle,
+      // dira pourquoi. Le manifeste se lit en quelques millisecondes.
+      try {
+        readManifest(bytes);
+      } catch {
+        return;
+      }
       const sha256 = await sha256Expo(bytes);
-      const { backup: dto, alreadyThere: known } = await timed('synchronisation', `dépôt de ${info.name} en ${slot.toUpperCase()}`,
+      const { backup: dto, alreadyThere: known } = await timed('synchronisation', `dépôt en ${slot.toUpperCase()}`,
         () => cloud.uploadBackup(slot, info, bytes, sha256));
       if (known) alreadyThere.current.add(dto.id);
       if (picks.current[slot] === pickNo) setRemote((r) => ({ ...r, [slot]: dto }));
     } catch (err) {
+      // Lecture ratée ou fichier remplacé entre-temps : rien à signaler de plus.
+      if (err instanceof ReadAborted) return;
       setError(surface(`dépôt dans le compte, emplacement ${slot.toUpperCase()}`, err));
     } finally {
       if (picks.current[slot] === pickNo) setUploading((u) => ({ ...u, [slot]: false }));
@@ -912,7 +933,7 @@ function Confluent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <Confluent />
+      <Tserohr />
     </SafeAreaProvider>
   );
 }

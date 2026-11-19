@@ -30,7 +30,7 @@ export function MyAccountScreen({ email, busy, onBack, onSignOut, onDeleted }: {
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.header}>
-        <Eyebrow>Compte Confluent</Eyebrow>
+        <Eyebrow>Compte Tserohr</Eyebrow>
         <Text style={text.title}>Mon compte</Text>
         <Text style={text.lead}>
           Connecté en tant que <Text style={styles.email}>{email}</Text>.

@@ -1,5 +1,5 @@
 /**
- * Comptes Confluent : Better Auth, adossé à Postgres par Prisma.
+ * Comptes Tserohr : Better Auth, adossé à Postgres par Prisma.
  *
  * Le site et l'app mobile partagent les mêmes comptes. Le navigateur tient sa
  * session dans un cookie ; l'app, par le plugin `expo()`, la garde dans le
@@ -37,7 +37,7 @@ function siteUrl(): string | undefined {
 function trustedOrigins(): string[] {
   const origins = [
     // Le schéma de l'app (`app.json`) : sans lui, la session mobile ne tient pas.
-    'confluent://',
+    'tserohr://',
   ];
   // Une Preview répond aussi sur l'adresse propre au déploiement.
   if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {

@@ -8,7 +8,7 @@ describe('describeError', () => {
     const view = describeError(new AppError({
       title: 'Format non pris en charge',
       message: 'Version de JW Library trop récente.',
-      hint: 'Mets Confluent à jour.',
+      hint: 'Mets Tserohr à jour.',
       technical: 'schemaVersion 17, attendu 16',
     }));
 

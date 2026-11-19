@@ -70,7 +70,7 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
     <div className={s.screen}>
       <form className={s.scroll} onSubmit={(e) => void submit(e)}>
         <header className={s.header}>
-          <Eyebrow>Compte Confluent</Eyebrow>
+          <Eyebrow>Compte Tserohr</Eyebrow>
           <h1 className={s.title}>{signingUp ? 'Créer un compte' : 'Se connecter'}</h1>
           <p className={s.lead}>
             Pour retrouver tes sauvegardes et tes fusions sur tous tes appareils. La fusion, elle, marche sans compte.

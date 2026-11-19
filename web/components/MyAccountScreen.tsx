@@ -31,7 +31,7 @@ export function MyAccountScreen({ email, busy, onBack, onSignOut, onDeleted }: {
     <div className={s.screen}>
       <div className={s.scroll}>
         <header className={s.header}>
-          <Eyebrow>Compte Confluent</Eyebrow>
+          <Eyebrow>Compte Tserohr</Eyebrow>
           <h1 className={s.title}>Mon compte</h1>
           <p className={s.lead}>
             Connecté en tant que <strong className={s.deleteEmail}>{email}</strong>.

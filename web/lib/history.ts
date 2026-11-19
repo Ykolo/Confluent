@@ -5,7 +5,7 @@
  * IndexedDB — `localStorage` ne tient que du texte, et quelques mégaoctets au
  * plus — pour pouvoir les retélécharger depuis l'historique.
  */
-const KEY = 'confluent.history.v1';
+const KEY = 'tserohr.history.v1';
 const LIMIT = 30;
 
 /**
@@ -15,7 +15,7 @@ const LIMIT = 30;
  */
 export const FILES_KEPT = 10;
 
-const DB_NAME = 'confluent';
+const DB_NAME = 'tserohr';
 const STORE = 'fusions';
 
 export interface HistoryEntry {

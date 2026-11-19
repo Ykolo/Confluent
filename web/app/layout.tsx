@@ -19,7 +19,7 @@ const serif = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: 'Confluent',
+  title: 'Tserohr',
   description: 'Fusionner deux sauvegardes JW Library, sans rien perdre. Tout se passe dans votre navigateur.',
 };
 

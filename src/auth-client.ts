@@ -15,15 +15,15 @@ import * as SecureStore from 'expo-secure-store';
  * et par `.env` en développement (l'IP du PC sur le réseau local, voir
  * `.env.example`). À défaut, le site en production.
  */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://confluent-web.vercel.app').replace(/\/+$/, '');
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.tserohr.com').replace(/\/+$/, '');
 
 export const authClient = createAuthClient({
   baseURL: API_URL,
   plugins: [
     expoClient({
       // Le schéma déclaré dans `app.json` ; le serveur l'admet dans `trustedOrigins`.
-      scheme: 'confluent',
-      storagePrefix: 'confluent',
+      scheme: 'tserohr',
+      storagePrefix: 'tserohr',
       storage: SecureStore,
     }),
   ],

@@ -15,7 +15,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 
 import type { MergeDto } from './cloud/types';
 
-const KEY = 'confluent.history.v1';
+const KEY = 'tserohr.history.v1';
 const LIMIT = 30;
 
 /**

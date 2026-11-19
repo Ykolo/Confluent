@@ -224,7 +224,7 @@ export function withTimeout<T>(
 // Journal — visible dans le terminal Expo, sur le poste de développement
 // ---------------------------------------------------------------------------
 
-const TAG = 'Confluent';
+const TAG = 'Tserohr';
 
 /**
  * Heure locale, au format `HH:MM:SS.mmm`.
@@ -323,13 +323,13 @@ export function installGlobalErrorLogging(): void {
     setGlobalHandler(handler: (err: unknown, fatal?: boolean) => void): void;
   } }).ErrorUtils;
 
-  if (utils && !(utils as { __confluent?: boolean }).__confluent) {
+  if (utils && !(utils as { __tserohr?: boolean }).__tserohr) {
     const previous = utils.getGlobalHandler();
     utils.setGlobalHandler((err, fatal) => {
       logError(fatal ? 'erreur fatale' : 'erreur non rattrapée', err);
       previous(err, fatal);
     });
-    (utils as { __confluent?: boolean }).__confluent = true;
+    (utils as { __tserohr?: boolean }).__tserohr = true;
   }
 
   const hermes = globalThis as { HermesInternal?: { hasPromise?: unknown } };

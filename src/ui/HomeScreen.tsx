@@ -147,7 +147,7 @@ export function HomeScreen({
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Eyebrow>Confluent</Eyebrow>
+          <Eyebrow>Tserohr</Eyebrow>
           <Text style={styles.title}>Fusionner deux sauvegardes</Text>
         </View>
 

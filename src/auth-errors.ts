@@ -95,7 +95,7 @@ export function describeAuthError(err: AuthFailure | null | undefined): ErrorVie
   if (!err?.status) {
     return {
       title: 'Pas de connexion',
-      message: 'Le serveur de Confluent n’a pas pu être joint.',
+      message: 'Le serveur de Tserohr n’a pas pu être joint.',
       hint: 'Vérifie ta connexion internet, puis réessaie.',
       technical,
     };

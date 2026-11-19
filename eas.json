@@ -8,7 +8,7 @@
       "distribution": "internal",
       "bun": "1.4.0",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://confluent-web.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://www.tserohr.com"
       },
       "android": {
         "buildType": "apk"
@@ -17,7 +17,7 @@
     "production": {
       "bun": "1.4.0",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://confluent-web.vercel.app"
+        "EXPO_PUBLIC_API_URL": "https://www.tserohr.com"
       },
       "android": {
         "buildType": "app-bundle"

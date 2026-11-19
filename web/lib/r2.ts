@@ -61,7 +61,7 @@ export function userPrefixes(userId: string): string[] {
  * ASCII pour les vieux clients ; `filename*` porte le vrai nom en UTF-8.
  */
 export function attachment(fileName: string): string {
-  const ascii = fileName.normalize('NFD').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '_') || 'confluent.jwlibrary';
+  const ascii = fileName.normalize('NFD').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '_') || 'tserohr.jwlibrary';
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeRfc5987(fileName)}`;
 }
 

@@ -17,7 +17,7 @@ import { createBunHost } from '../src/platform/sqlite-bun';
 import { androidBackup, ipadBackup } from './fixtures/backups';
 
 const host = createBunHost();
-const scratch = mkdtempSync(join(tmpdir(), 'confluent-wal-'));
+const scratch = mkdtempSync(join(tmpdir(), 'tserohr-wal-'));
 afterAll(() => {
   host.dispose();
   rmSync(scratch, { recursive: true, force: true });

@@ -1,4 +1,4 @@
-// Comptes et synchronisation de Confluent.
+// Comptes et synchronisation de Tserohr.
 //
 // Les sauvegardes et les fusions elles-mêmes vivent dans R2 (`objectKey`) :
 // la base ne garde que leurs métadonnées. Les clés commencent par le type

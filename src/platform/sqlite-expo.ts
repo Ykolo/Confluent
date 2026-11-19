@@ -37,8 +37,8 @@ function workspace(): Directory {
  * `Directory.uri` est une URI percent-encodée, `sqlite3_open` attend un
  * chemin nu — d'où la tentation de décoder. Sauf que sous Expo Go le
  * répertoire cloisonné porte sur le disque un nom qui *contient* déjà des
- * séquences `%xx` (`%40anonymous%2Fconfluent-…`) : décoder donne alors
- * `@anonymous/confluent-…`, un chemin qui n'existe pas. Impossible de trancher
+ * séquences `%xx` (`%40anonymous%2Ftserohr-…`) : décoder donne alors
+ * `@anonymous/tserohr-…`, un chemin qui n'existe pas. Impossible de trancher
  * a priori — on essaie donc les deux et on garde celui qui répond.
  */
 function pathCandidates(dir: Directory): string[] {
@@ -53,7 +53,7 @@ function pathCandidates(dir: Directory): string[] {
   return candidates;
 }
 
-const PROBE = 'confluent-probe.db';
+const PROBE = 'tserohr-probe.db';
 
 /**
  * Vrai si une base créée par expo-sqlite sous `path` réapparaît bien dans

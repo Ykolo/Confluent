@@ -67,7 +67,7 @@ export function AccountScreen({ onDone }: { onDone: () => void }) {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Eyebrow>Compte Confluent</Eyebrow>
+          <Eyebrow>Compte Tserohr</Eyebrow>
           <Text style={text.title}>{signingUp ? 'Créer un compte' : 'Se connecter'}</Text>
           <Text style={text.lead}>
             Pour retrouver tes sauvegardes et tes fusions sur tous tes appareils. La fusion, elle, marche sans compte.

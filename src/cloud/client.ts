@@ -43,8 +43,15 @@ export interface CloudClient {
    * Dépose une sauvegarde dans un emplacement : ticket, envoi vers R2,
    * confirmation. Si l'emplacement contient déjà ce fichier, rien n'est
    * envoyé (`alreadyThere`).
+   *
+   * `info` peut être une promesse : l'envoi part aussitôt, pendant que la
+   * sauvegarde est encore en lecture, et n'attend ses compteurs que pour la
+   * confirmation. Si elle rejette, le dépôt s'arrête là, sans confirmation
+   * (le ménage quotidien efface l'envoi abandonné).
    */
-  uploadBackup(slot: Slot, info: BackupMeta, body: FileBody, sha256: string): Promise<UploadedBackup>;
+  uploadBackup(
+    slot: Slot, info: BackupMeta | PromiseLike<BackupMeta>, body: FileBody, sha256: string,
+  ): Promise<UploadedBackup>;
   /** Récupère le contenu d'une sauvegarde déposée. */
   downloadBackup(backup: BackupDto): Promise<Uint8Array>;
   /**
@@ -65,7 +72,7 @@ export interface CloudClient {
 }
 
 export interface CloudClientOptions {
-  /** Adresse du serveur, sans `/` final : `https://confluent-web.vercel.app`. */
+  /** Adresse du serveur, sans `/` final : `https://www.tserohr.com`. */
   baseUrl: string;
   /** Le `fetch` de la plateforme ; seule cette forme d'appel est utilisée. */
   fetch: (url: string, init?: RequestInit) => Promise<Response>;
@@ -118,7 +125,7 @@ function viewFor(status: number): { title: string; message: string; hint?: strin
     return { title: 'Trop de tentatives', message: 'Le serveur demande de patienter un peu.', hint: 'Patiente, puis réessaie.' };
   }
   if (status >= 500) {
-    return { title: 'Serveur indisponible', message: 'Le serveur de Confluent n’a pas pu répondre.', hint: 'Réessaie dans quelques instants.' };
+    return { title: 'Serveur indisponible', message: 'Le serveur de Tserohr n’a pas pu répondre.', hint: 'Réessaie dans quelques instants.' };
   }
   return { title: 'Requête refusée', message: 'Le serveur a refusé la demande.', hint: 'Mets l’app à jour si le problème persiste.' };
 }
@@ -126,7 +133,7 @@ function viewFor(status: number): { title: string; message: string; hint?: strin
 function networkError(what: string, cause: unknown): CloudError {
   return new CloudError(0, 'network', {
     title: 'Pas de connexion',
-    message: 'Le serveur de Confluent n’a pas pu être joint.',
+    message: 'Le serveur de Tserohr n’a pas pu être joint.',
     hint: 'Vérifie ta connexion internet, puis réessaie.',
     technical: `${what} : ${cause instanceof Error ? cause.message : String(cause)}`,
     cause,
@@ -204,12 +211,13 @@ export function createCloudClient(opts: CloudClientOptions): CloudClient {
       });
       if ('existing' in answer) return { backup: answer.existing, alreadyThere: true };
       await storage('PUT', answer.putUrl, body);
+      const meta = await info;
       const backup = await call<BackupDto>('POST', `/api/backups/${encodeURIComponent(answer.id)}/confirm`, {
         slot,
-        name: info.name,
-        deviceName: info.deviceName,
-        backupCreatedAt: info.createdAt,
-        counts: info.counts,
+        name: meta.name,
+        deviceName: meta.deviceName,
+        backupCreatedAt: meta.createdAt,
+        counts: meta.counts,
         uploadedFrom: opts.uploadedFrom ?? null,
       });
       return { backup, alreadyThere: false };

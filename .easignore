@@ -11,4 +11,7 @@ tests/
 docs/
 
 # Le site web se construit ailleurs : rien à y faire pour compiler l'app.
-web/
+# Sauf son package.json : la racine le déclare comme workspace, et le
+# `bun install` qui suit le prebuild échoue s'il ne le trouve pas.
+web/*
+!web/package.json

@@ -15,7 +15,7 @@ import type { OpenDatabase, Sha256, SqliteHost, SqlValue } from '../merge';
 
 /** Hôte SQLite adossé à un répertoire temporaire, nettoyé par `dispose()`. */
 export function createBunHost(): SqliteHost & { dispose(): void } {
-  const dir = mkdtempSync(join(tmpdir(), 'confluent-'));
+  const dir = mkdtempSync(join(tmpdir(), 'tserohr-'));
 
   return {
     async open(

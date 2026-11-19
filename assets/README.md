@@ -1,6 +1,6 @@
-# Confluent — icône de l'application
+# Tserohr — icône de l'application
 
-Marque retenue : « le confluent » — deux traits qui se rejoignent en une seule descente.
+Motif retenu : « le confluent » — deux traits qui se rejoignent en une seule descente.
 Dessin vectoriel fait à la main, à retoucher si besoin par un designer.
 
 ## Fichiers

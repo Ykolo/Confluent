@@ -1,5 +1,5 @@
 /**
- * Confluent, version web — le pendant de `App.tsx`.
+ * Tserohr, version web — le pendant de `App.tsx`.
  *
  * Mêmes trois écrans, même moteur (`src/merge.ts`), même découpage en
  * tranches pour garder l'écran vivant. Ce qui change est ce que le navigateur
@@ -17,7 +17,8 @@ import { inspectBackup, type BackupInfo } from '@core/backup-info';
 import { describeKeptSlot, type BackupDto, type MergeDto, type MergeMeta, type MergePage } from '@core/cloud/types';
 import { isCancellation, logError, logInfo, stopwatch, type ErrorView } from '@core/errors';
 import * as fmt from '@core/format';
-import { mergeBackups, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
+import { deferred, ReadAborted } from '@core/deferred';
+import { mergeBackups, readManifest, type Backup, type ConflictStrategy, type MergeReport } from '@core/merge';
 import { overallRatio } from '@core/progress';
 
 import { signOut, useSession } from '@/lib/auth-client';
@@ -133,7 +134,7 @@ function AccountBar({ signedIn, pending, disabled, onSignIn, onOpenAccount }: {
   );
 }
 
-export function Confluent() {
+export function Tserohr() {
   const [tab, setTab] = useState<Tab>('merge');
   const [fileA, setFileA] = useState<BackupInfo | null>(null);
   const [fileB, setFileB] = useState<BackupInfo | null>(null);
@@ -294,36 +295,54 @@ export function Confluent() {
   /** Sauvegardes qu'un dépôt a trouvées déjà dans le compte, pour le dire sous la carte. */
   const alreadyThere = useRef(new Set<string>());
 
-  /** Dépose en tâche de fond le fichier qu'on vient de lire. */
-  const keepRemotely = useCallback(async (slot: Slot, picked: File, info: BackupInfo, pick: number) => {
+  /**
+   * Dépose dans le compte le fichier choisi. Part dès le choix, en même temps
+   * que la lecture : l'envoi vers R2 et la décompression se recouvrent, et
+   * seule la confirmation attend les compteurs (`info`).
+   */
+  const keepRemotely = useCallback(async (slot: Slot, picked: File, info: Promise<BackupInfo>, pick: number) => {
     setUploading((u) => ({ ...u, [slot]: true }));
     try {
-      const sha256 = await sha256Web(new Uint8Array(await picked.arrayBuffer()));
+      const bytes = new Uint8Array(await picked.arrayBuffer());
+      // Un fichier qui n'est pas une sauvegarde ne part pas : la lecture, elle,
+      // dira pourquoi. Le manifeste se lit en quelques millisecondes.
+      try {
+        readManifest(bytes);
+      } catch {
+        return;
+      }
+      const sha256 = await sha256Web(bytes);
       const { backup: dto, alreadyThere: known } = await cloud.uploadBackup(slot, info, picked, sha256);
       if (known) alreadyThere.current.add(dto.id);
       if (picks.current[slot] === pick) setRemote((r) => ({ ...r, [slot]: dto }));
-      logInfo('synchronisation', `${info.name} déposé en ${slot.toUpperCase()}`);
+      logInfo('synchronisation', `${dto.name} déposé en ${slot.toUpperCase()}`);
     } catch (err) {
+      // Lecture ratée ou fichier remplacé entre-temps : rien à signaler de plus.
+      if (err instanceof ReadAborted) return;
       setError(logError(`dépôt dans le compte, emplacement ${slot.toUpperCase()}`, err));
     } finally {
       if (picks.current[slot] === pick) setUploading((u) => ({ ...u, [slot]: false }));
     }
   }, []);
 
-  /** Choix d'un fichier local : lecture, puis dépôt dans le compte si demandé. */
+  /** Choix d'un fichier local : lecture, et en même temps dépôt dans le compte si demandé. */
   const pickLocal = useCallback(async (slot: Slot, picked: File) => {
     const pick = ++picks.current[slot];
     setRemote((r) => ({ ...r, [slot]: null }));
     setUploading((u) => ({ ...u, [slot]: false }));
+    const meta = userId && keepInAccount ? deferred<BackupInfo>() : null;
+    if (meta) void keepRemotely(slot, picked, meta.promise, pick);
     const info = await read(slot, {
       name: picked.name,
       what: 'choix du fichier',
       firstStep: 'ouverture du fichier',
       open: async () => new Uint8Array(await picked.arrayBuffer()),
     });
-    if (info && userId && keepInAccount && picks.current[slot] === pick) {
-      void keepRemotely(slot, picked, info, pick);
-    }
+    // Le dépôt n'est confirmé que si la lecture a réussi et que le fichier
+    // n'a pas été remplacé pendant ce temps.
+    if (!meta) return;
+    if (info && picks.current[slot] === pick) meta.resolve(info);
+    else meta.reject(new ReadAborted());
   }, [read, userId, keepInAccount, keepRemotely]);
 
   const removeRemote = useCallback(async (slot: Slot) => {
